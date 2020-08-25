@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>COSY-MAP相椭圆绘制</title>
+    <link rel="stylesheet" href="./css/element-ui.css">
+    <style>
+        .console {
+            font-size: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <el-row>
+            <el-col :span="12">
+                <div class="grid-content bg-purple">
+                    <h2 class="title">COSY MAP 相椭圆绘制工具 v1.0</h2>
+                    <div style="margin: 20px 0;"></div>
+                    <h4>粒子参数设定</h4>
+                    <el-form :inline="true" :model="inputpp" class="demo-form-inline">
+                        <el-form-item label="σx/m">
+                            <el-input v-model="inputpp.x"></el-input>
+                        </el-form-item>
+                        <el-form-item label="σx'/r">
+                            <el-input v-model="inputpp.xp"></el-input>
+                        </el-form-item>
+                        <el-form-item label="σy/m">
+                            <el-input v-model="inputpp.y"></el-input>
+                        </el-form-item>
+                        <el-form-item label="σy'/r">
+                            <el-input v-model="inputpp.yp"></el-input>
+                        </el-form-item>
+                        <el-form-item label="dp/1">
+                            <el-input v-model="inputpp.dp_input"></el-input>
+                        </el-form-item>
+                        <el-form-item label="粒子数目">
+                            <el-input v-model="number"></el-input>
+                        </el-form-item>
+                        <el-form-item label="图例">
+                            <el-input v-model="legend"></el-input>
+                        </el-form-item>
+                        <el-form-item>
+                            <el-button type="primary" @click="plot">绘制</el-button>
+                        </el-form-item>
+                    </el-form>
+                    <h4>COSY MAP 输入框</h4>
+                    <el-input type="textarea" :autosize="{ minRows: 10, maxRows: 30}" placeholder="把COSY MAP粘贴到此处..."
+                        v-model="cosymap">
+                    </el-input>
+                    <div class="console">
+                        <div v-for="p in runP">
+                            {{ p }}
+                        </div>
+                    </div>
+                </div>
+            </el-col>
+            <el-col :span="12">
+                <div class="grid-content bg-purple-light">
+                    <div id="plotxx" style="width:800px;height:800px;border: 1px 1px 1px 1px black;"></div>
+                    <div id="plotyy" style="width:800px;height:800px;border: 1px 1px 1px 1px black;"></div>
+                </div>
+            </el-col>
+        </el-row>
+    </div>
+</body>
+<script src="./js/vue.js"></script>
+<script src="./js/plotly-latest.min.js" charset="utf-8"></script>
+<script src="./js/element-index.js"></script>
+<script>
+    var ITEM_LENGTH = "-0.0000000E+00".length;
+    var ESP_0 = 1.0e-6;
+    var STATIC_ENERGY_MeV = 938.2719665019625;
+    var app = new Vue({
+        el: '#app',
+        data() {
+            return {
+                cosymap: `  0.2971867      1.732245     0.0000000E+00 0.0000000E+00 0.2360767E-02 100000
+ -0.5362395     0.2392488     0.0000000E+00 0.0000000E+00-0.3330065E-02 010000
+  0.0000000E+00 0.0000000E+00 0.7546332     0.4637937     0.0000000E+00 001000
+  0.0000000E+00 0.0000000E+00-0.5211197      1.004870     0.0000000E+00 000100
+  0.0000000E+00 0.0000000E+00 0.0000000E+00 0.0000000E+00  1.000000     000010
+  0.2762855E-03-0.6333300E-02 0.0000000E+00 0.0000000E+00  1.902852     000001`,
+                parse: '',
+                inputpp: {
+                    x: 3.5 / 1000,
+                    y: 3.5 / 1000,
+                    xp: 7.5 / 1000,
+                    yp: 7.5 / 1000,
+                    z: 0,
+                    dp: 0.0,
+                    dp_input: 5. / 100
+                },
+                number: 32,
+                runP: [],
+                legend: '相椭圆',
+                plotTimes: 0
+            }
+        },
+        methods: {
+            plot() {
+                this.runP = [];
+                this.inputpp.dp = this.inputpp.dp_input / ((250 + STATIC_ENERGY_MeV) / (250 + 2 * STATIC_ENERGY_MeV));
+                console.log("能量分散：" + this.inputpp.dp);
+
+
+                if (this.legend.substring(0, 3) == "相椭圆") {
+                    this.plotTimes++;
+                    this.legend = "相椭圆" + this.plotTimes;
+                }
+
+                var pp = this.inputpp;
+                var ppxs = this.phaseSpaceParticlesAlongPositiveEllipseInXXpPlane(
+                    pp.x, pp.xp, pp.dp, this.number
+                );
+                var ppys = this.phaseSpaceParticlesAlongPositiveEllipseInYYpPlane(
+                    pp.x, pp.xp, pp.dp, this.number
+                );
+
+                var runppxs = [];
+                var runppys = [];
+
+                var plxs = [];
+                var plys = [];
+
+                for (var i = 0; i < this.number; i++) {
+                    runppxs[i] = this.apply(ppxs[i]);
+                    runppys[i] = this.apply(ppys[i]);
+
+                    // this.runP.push(runppxs[i]);
+                    // this.runP.push(runppys[i]);
+
+                    plxs[i] = { x: runppxs[i].x * 1000, y: runppxs[i].xp * 1000 };
+                    plys[i] = { x: runppys[i].y * 1000, y: runppys[i].yp * 1000 };
+                }
+
+                plxs.push(plxs[0]);
+                plys.push(plys[0]);
+
+                // plxs.forEach(px=>{this.runP.push(px.x+" 去 "+px.y)});
+                // this.runP.push("---------------");
+                // plys.forEach(px=>{this.runP.push(px.x+" 去 "+px.y)});
+
+                this.plotly(plxs, "plotxx", "X-XP 相空间", this.legend);
+                this.plotly(plys, "plotyy", "Y-YP 相空间", this.legend);
+            },
+            apply(p0) {
+                //console.log(this.cosymap);
+
+                //console.log(ITEM_LENGTH);
+                var x = 0.0;
+                var xp = 0.0;
+                var y = 0.0;
+                var yp = 0.0;
+
+
+                var contributionLinesString = this.cosymap.split("\n");
+                //console.log(contributionLinesString);
+
+                for (var i in contributionLinesString) {
+                    var contributionLineString = contributionLinesString[i];
+                    //console.log(contributionLineString);
+
+                    var xContributionString = contributionLineString.substring(0, ITEM_LENGTH + 1);
+                    var xpContributionString = contributionLineString.substring(ITEM_LENGTH + 1, ITEM_LENGTH * 2 + 1);
+                    var yContributionString = contributionLineString.substring(ITEM_LENGTH * 2 + 1, ITEM_LENGTH * 3 + 1);
+                    var ypContributionString = contributionLineString.substring(ITEM_LENGTH * 3 + 1, ITEM_LENGTH * 4 + 1);
+
+                    var contributionDescribing = contributionLineString.substring(ITEM_LENGTH * 5 + 2);
+                    var contributionBy = this.contributionBy(contributionDescribing, p0);
+
+                    var xContribution = parseFloat(xContributionString);
+                    x += xContribution * contributionBy;
+
+                    var xpContribution = parseFloat(xpContributionString);
+                    xp += xpContribution * contributionBy;
+
+                    var yContribution = parseFloat(yContributionString);
+                    y += yContribution * contributionBy;
+
+                    var ypContribution = parseFloat(ypContributionString);
+                    yp += ypContribution * contributionBy;
+
+
+                    // console.log({
+                    //     contributionDescribing, xContributionString, xpContributionString, yContributionString, ypContributionString
+                    // });
+
+                    // console.log({
+                    //     contributionBy, xContribution, xpContribution, yContribution, ypContribution
+                    // });
+
+                    // console.log({
+                    //     x, xp, y, yp, z: p0.z, dp: p0.dp
+                    // });
+
+
+                }
+
+                return {
+                    x, xp, y, yp, z: p0.z, dp: p0.dp
+                };
+            },
+            contributionBy(contributionDescribing, pp) {
+                var by = 1.0;
+
+                var x = pp.x;
+                var xp = pp.xp;
+                var y = pp.y;
+                var yp = pp.yp;
+                var delta = pp.dp;
+
+
+                var byX = contributionDescribing.charAt(0) - '0';
+                by *= Math.pow(x, byX);
+
+                var byXP = contributionDescribing.charAt(1) - '0';
+                by *= Math.pow(xp, byXP);
+
+                var byY = contributionDescribing.charAt(2) - '0';
+                by *= Math.pow(y, byY);
+
+                var byYP = contributionDescribing.charAt(3) - '0';
+                by *= Math.pow(yp, byYP);
+
+                var byDelta = contributionDescribing.charAt(5) - '0';
+                by *= Math.pow(delta, byDelta);
+
+                return by;
+            },
+            ellipsePoints(A, B, C, D, number) {
+                var list = [];
+                var circumference = this.ellipseCircumference(A, B, C, D);
+                for (var i = 0; i < number; i++) {
+                    list.push(this.ellipseWalkPoint(A, B, C, D, circumference / number * i));
+                }
+
+                return list;
+            },
+            ellipseCircumference(A, B, C, D) {
+                var num = 3600 * 4;
+                var c = 0.0;
+                for (var i = 0; i < num; i++) {
+                    c += this.pointLength(
+                        this.ellipsePointTheta(A, B, C, D, 2.0 * Math.PI / num * i),
+                        this.ellipsePointTheta(A, B, C, D, 2.0 * Math.PI / num * (i + 1))
+                    );
+                }
+
+                return c;
+            },
+            ellipsePointTheta(A, B, C, D, theta) {
+                var pi = Math.PI;
+                var d = { x: 0.0, y: 0.0 };
+
+
+                while (theta < 0)
+                    theta += 2 * pi;
+                while (theta > 2 * pi)
+                    theta -= 2 * pi;//将弧度th限定在0~2pi
+
+                if (Math.abs(theta) < ESP_0 || Math.abs(theta - 2 * pi) < ESP_0) {
+                    d.x = Math.sqrt(D / A);
+                    d.y = 0;
+                }
+                if (Math.abs(theta - pi) < ESP_0) {
+                    d.x = -Math.sqrt(D / A);
+                    d.y = 0;
+                }
+                //临界问题
+                var t = 0.0;
+                if (theta > 0 && theta < pi) {
+                    t = 1 / Math.tan(theta);
+                    d.y = Math.sqrt(D / (A * t * t + B * t + C));
+                    d.x = t * d.y;
+                    //printf("\ntest\n");
+                    //printf_divct(d);
+                }
+                if (theta > pi && theta < 2 * pi) {
+                    theta -= pi;
+                    t = 1 / Math.tan(theta);
+                    d.y = -Math.sqrt(D / (A * t * t + B * t + C));
+                    d.x = t * d.y;
+                }
+                //射线——负号问题，象限问题
+
+                return d;
+            },
+            ellipseWalkPoint(A, B, C, D, length) {
+                var stepTheta = Math.PI / 180.0 / 20.0;
+                var theta = 0.0;
+                while (length > 0.0) {
+                    length -= this.pointLength(
+                        this.ellipsePointTheta(A, B, C, D, theta),
+                        this.ellipsePointTheta(A, B, C, D, theta + stepTheta)
+                    );
+
+                    theta += stepTheta;
+                }
+
+                return this.ellipsePointTheta(A, B, C, D, theta);
+            },
+            pointLength(p0, p1) {
+                return Math.sqrt(
+                    (p0.x - p1.x) * (p0.x - p1.x) + (p0.y - p1.y) * (p0.y - p1.y)
+                );
+            },
+            plotly(ps, domId, title, legend) {
+                var xs = [];
+                var ys = [];
+                for (i in ps) {
+                    p = ps[i];
+                    xs[i] = p.x;
+                    ys[i] = p.y;
+                }
+
+                var layout = {
+                    title: title,
+                    xaxis: {
+                        title: 'mm',
+                        mode: 'lines+markers',
+                    },
+                    yaxis: {
+                        title: 'mrad',
+                        mode: 'lines+markers',
+                        scaleanchor: "x"
+                    }
+                };
+
+                TESTER = document.getElementById(domId);
+                Plotly.plot(TESTER, [{
+                    x: xs, y: ys, name: legend
+                }], layout
+                );
+            },
+            phaseSpaceParticlesAlongPositiveEllipseInXXpPlane(
+                xMax, xpMax, delta, number) {
+                //Ax^2+Bxy+Cy^2=D 椭返回圆圆周上均匀分布number个点
+                var A = 1 / Math.pow(xMax, 2);
+                var B = 0;
+                var C = 1 / Math.pow(xpMax, 2);
+                var D = 1;
+
+                var pps = [];
+                var eps = this.ellipsePoints(A, B, C, D, number);
+                for (i in eps) {
+                    var e = eps[i];
+                    pps.push({
+                        x: e.x,
+                        xp: e.y,
+                        y: 0.0,
+                        yp: 0.0,
+                        z: 0.0,
+                        dp: delta
+                    });
+                }
+
+                return pps;
+            },
+            phaseSpaceParticlesAlongPositiveEllipseInYYpPlane(
+                xMax, xpMax, delta, number) {
+                //Ax^2+Bxy+Cy^2=D 椭返回圆圆周上均匀分布number个点
+                var A = 1 / Math.pow(xMax, 2);
+                var B = 0;
+                var C = 1 / Math.pow(xpMax, 2);
+                var D = 1;
+
+                var pps = [];
+                var eps = this.ellipsePoints(A, B, C, D, number);
+                for (i in eps) {
+                    var e = eps[i];
+                    pps.push({
+                        y: e.x,
+                        yp: e.y,
+                        x: 0.0,
+                        xp: 0.0,
+                        z: 0.0,
+                        dp: delta
+                    });
+                }
+
+                return pps;
+            }
+        }
+    })
+</script>
+
+</html>
