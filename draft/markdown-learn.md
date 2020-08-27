@@ -26,4 +26,8 @@ public static void main(){}
 ## 图片
 小图
 
+ <img src="./small.png" alt="图片名称"/>
+
 大图
+
+ <img src="./big.png" alt="图片名称"/>
