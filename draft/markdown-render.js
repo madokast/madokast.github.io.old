@@ -22,16 +22,19 @@ function doRender(content, container) {
     var start = 0;
     for (var i = 0; i < lines.length; i++) {
         var line = lines[i].trim();
-        if(line.startsWith(img_left)){
-            content[content.length] = markdown.toHTML(lines.slice(start,i).join('\n'));
+        if (line.startsWith(img_left)) {
+            content[content.length] = markdown.toHTML(lines.slice(start, i).join('\n'));
             content[content.length] = line;
-            start = i+1;
+            start = i + 1;
         }
     }
-    content[content.length] = markdown.toHTML(lines.slice(start,i).join('\n'));
+    content[content.length] = markdown.toHTML(lines.slice(start, i).join('\n'));
     container.innerHTML = content.join('\n');
 };
 
-var container = document.getElementById('container');
-var url = container.getAttribute('url');
-render(url, container);
+
+window.onload = function () {
+    var container = document.getElementById('container');
+    var url = container.getAttribute('url');
+    render(url, container);
+}
