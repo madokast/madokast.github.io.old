@@ -24,11 +24,16 @@ function doRender(content, container) {
         var line = lines[i].trim();
         if (line.startsWith(img_left)) {
             content[content.length] = markdown.toHTML(lines.slice(start, i).join('\n'));
+            console.log(lines.slice(start, i).join('\n'));
+            console.log(markdown.toHTML(lines.slice(start, i).join('\n')));
             content[content.length] = line;
             start = i + 1;
         }
     }
-    content[content.length] = markdown.toHTML(lines.slice(start, i).join('\n'));
+
+    content[content.length] = markdown.toHTML(lines.slice(start, lines.length).join('\n'));
+    console.log(lines.slice(start, i).join('\n'));
+    console.log(markdown.toHTML(lines.slice(start, i).join('\n')));
     container.innerHTML = content.join('\n');
 };
 
