@@ -27,6 +27,8 @@ var MARKDOWM_TITLE = '#'; // 标题
 var HTML_H1 = ['<h1>', '</h1>']; var HTML_H2 = ['<h2>', '</h2>']; var HTML_H3 = ['<h3>', '</h3>'];
 var HTML_P = ['<p>', '</p>'];
 var HTML_PRE = ['<pre>', '</pre>']; var HTML_UL = ['<ul>', '</ul>']; var HTML_OL = ['<ol>', '</ol>']; var HTML_LI = ['<li>', '</li>'];
+var HTML_STRONG = ['<strong>', '</strong>']; var HTML_EM = ['<em>', '</em>']; var HTML_INLINE_CODE = ['<span class="markdown-inline-code">','</span>']
+var MD_STRONG = '**'; var MD_EM = '*'; var MD_INLINE_CODE = '`';
 var MARKDOWM_TITLE = 1; var MARKDOWM_NORMAL = 2; var MARKDOWM_EMPTY_LINE = 3; var MARKDOWM_CODE = 4;
 var MARKDOWM_ORDER_LIST = 5; var MARKDOWM_UNORDER_LIST = 6; var MARKDOWM_HTML = 7;
 var HTMLS = [0, 1, 2, 3, HTML_PRE, HTML_OL, HTML_UL, 7];
@@ -61,7 +63,7 @@ function renderLine(line, content, levelStack) {
             if (peek == MARKDOWM_CODE && curMarkDown == MARKDOWM_CODE) {
                 levelStack.length = levelStack.length - 1; // pop
                 content[content.length] = HTMLS[curMarkDown][1];
-            } else if (peek != MARKDOWM_CODE && curMarkDown != MARKDOWM_CODE) {
+            } else if (peek != MARKDOWM_CODE && curMarkDown != MARKDOWM_CODE && peek != curMarkDown) {
                 levelStack[levelStack.length] = stateArr; // push
                 content[content.length] = HTMLS[curMarkDown][0];
             }
@@ -80,9 +82,8 @@ function renderLine(line, content, levelStack) {
         }
     }
 
-    console.log(line + "--" + levelStack);
-
     content[content.length] = solve(line, stateArr, levelStack);
+    console.log(line + " --> " + content[content.length - 1]);
 
     return levelStack;
 };
@@ -167,7 +168,7 @@ function solve(line, stateArr, levelStack) {
         if (levelStack.length > 0) {
             return line;
         } else {
-            return HTML_P[0] + line + HTML_P[1];
+            return HTML_P[0] + solveInLine(line) + HTML_P[1];
         }
     } else if (curState == MARKDOWM_EMPTY_LINE) {
         return '';
@@ -181,4 +182,55 @@ function solve(line, stateArr, levelStack) {
     } else if (curState == MARKDOWM_HTML) {
         return HTML_P[0] + line + HTML_P[1];
     }
+}
+
+// 行内 markdown 渲染，如加粗、斜体、行内代码块
+function solveInLine(line) {
+    var ret = '';
+    var boldStart = line.indexOf(MD_STRONG);
+    var start = 0;
+    while (boldStart != -1) {
+        var boldEnd = line.indexOf(MD_STRONG, boldStart + MD_STRONG.length);
+        if (boldEnd != -1) {
+            ret = ret + line.substring(start, boldStart) + HTML_STRONG[0] + line.substring(boldStart + MD_STRONG.length, boldEnd) + HTML_STRONG[1];
+            start = boldEnd + 2;
+            boldStart = line.indexOf(MD_STRONG, start);
+        } else {
+            break;
+        }
+    }
+
+    line = ret + line.substring(start);
+    ret = '';
+    start = 0;
+
+    var emStart = line.indexOf(MD_EM);
+    while (emStart != -1) {
+        var emEnd = line.indexOf(MD_EM, emStart + MD_EM.length);
+        if (emEnd != -1) {
+            ret = ret + line.substring(start, emStart) + HTML_EM[0] + line.substring(emStart + MD_EM.length, emEnd) + HTML_EM[1];
+            start = emEnd + MD_EM.length;
+            emStart = line.indexOf(MD_EM, start);
+        } else {
+            break;
+        }
+    }
+
+    line = ret + line.substring(start);
+    ret = '';
+    start = 0;
+
+    var inLineCodeStart = line.indexOf(MD_INLINE_CODE);
+    while (inLineCodeStart != -1) {
+        var inLineCodeEnd = line.indexOf(MD_INLINE_CODE, inLineCodeStart + MD_INLINE_CODE.length);
+        if (inLineCodeEnd != -1) {
+            ret = ret + line.substring(start, inLineCodeStart) + HTML_INLINE_CODE[0] + line.substring(inLineCodeStart + MD_INLINE_CODE.length, inLineCodeEnd) + HTML_INLINE_CODE[1];
+            start = inLineCodeEnd + MD_INLINE_CODE.length;
+            inLineCodeStart = line.indexOf(MD_INLINE_CODE, start);
+        } else {
+            break;
+        }
+    }
+
+    return ret + line.substring(start);
 }
