@@ -195,8 +195,6 @@ var MarkdownRender = {
     },
     // 行内渲染
     solveInLine: function (line) {
-        //console.log('before' + line);
-
         var ret = '';
         var boldStart = line.indexOf(this.CONSTENT.MD_STRONG);
         var start = 0;
@@ -248,8 +246,6 @@ var MarkdownRender = {
 
         line = ret + line.substring(start);
 
-        //console.log('after' + line);
-
         return line;
 
     },
@@ -263,7 +259,6 @@ var MarkdownRender = {
             var srcRef2 = srcRef1 == -1 ? -1 : line.indexOf('"', srcRef1 + 1);
             if (srcRef2 != -1) {
                 var src = line.substring(srcRef1 + 1, srcRef2).trim();
-                // console.log('src = ' + src);
                 return line.substring(0, srcRef1 + 1) + this.baseUrl + '/' + src + line.substring(srcRef2);
             }
         }
