@@ -95,7 +95,7 @@ var MarkdownRender = {
         }
 
         content[content.length] = this.solve(line, stateArr, levelStack);
-        console.log(line + " --> " + content[content.length - 1]);
+        //console.log(line + " --> " + content[content.length - 1]);
 
         return levelStack;
     },
@@ -186,15 +186,17 @@ var MarkdownRender = {
             // do nothing
         } else if (curState == this.CONSTENT.MARKDOWM_ORDER_LIST) {
             var number = stateArr[1];
-            return this.CONSTENT.HTML_LI[0] + line.substring(("" + number).length + 2) + this.CONSTENT.HTML_LI[1];
+            return this.CONSTENT.HTML_LI[0] + this.solveInLine(line.substring(("" + number).length + 2)) + this.CONSTENT.HTML_LI[1];
         } else if (curState == this.CONSTENT.MARKDOWM_UNORDER_LIST) {
-            return this.CONSTENT.HTML_LI[0] + line.substring(2) + this.CONSTENT.HTML_LI[1];
+            return this.CONSTENT.HTML_LI[0] + this.solveInLine(line.substring(2)) + this.CONSTENT.HTML_LI[1];
         } else if (curState == this.CONSTENT.MARKDOWM_HTML) {
             return this.CONSTENT.HTML_P[0] + this.solveHTML(line) + this.CONSTENT.HTML_P[1];
         }
     },
     // 行内渲染
     solveInLine: function (line) {
+        //console.log('before' + line);
+
         var ret = '';
         var boldStart = line.indexOf(this.CONSTENT.MD_STRONG);
         var start = 0;
@@ -244,7 +246,11 @@ var MarkdownRender = {
             }
         }
 
-        return ret + line.substring(start);
+        line = ret + line.substring(start);
+
+        //console.log('after' + line);
+
+        return line;
 
     },
     // 渲染 html
