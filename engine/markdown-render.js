@@ -23,10 +23,14 @@ var MarkdownRender = {
         MARKDOWM_HTML: 7,
         HTMLS: undefined // json 内无法引用内部变量 https://www.imooc.com/wenda/detail/571609 
     },
+    markDownUrl: null,
+    baseUrl: null,
     // 发送请求，渲染 markdown
     // url markdown文档地址
     // container 渲染目的地dom
     render: function (url, container) {
+        this.markDownUrl = url; // https://madokast.github.io/draft/markdown-learn.md
+        this.baseUrl = url.substring(0, url.lastIndexOf('/'));
         var that = this;
 
         //步骤一:创建异步对象
@@ -186,9 +190,10 @@ var MarkdownRender = {
         } else if (curState == this.CONSTENT.MARKDOWM_UNORDER_LIST) {
             return this.CONSTENT.HTML_LI[0] + line.substring(2) + this.CONSTENT.HTML_LI[1];
         } else if (curState == this.CONSTENT.MARKDOWM_HTML) {
-            return this.CONSTENT.HTML_P[0] + line + this.CONSTENT.HTML_P[1];
+            return this.CONSTENT.HTML_P[0] + this.solveHTML(line) + this.CONSTENT.HTML_P[1];
         }
     },
+    // 行内渲染
     solveInLine: function (line) {
         var ret = '';
         var boldStart = line.indexOf(this.CONSTENT.MD_STRONG);
@@ -241,6 +246,19 @@ var MarkdownRender = {
 
         return ret + line.substring(start);
 
+    },
+    // 渲染 html
+    solveHTML: function (line) {
+        // <img src="./small.png" alt="图片名称"/>
+        var srcIndex = line.indexOf('src');
+        if (srcIndex != -1) {
+            var srcRef1 = line.indexOf('"', srcIndex);
+            var srcRef2 = srcRef1 == -1 ? -1 : line.indexOf('"', srcRef1);
+            if (srcRef2 != -1) {
+                var src = line.substring(srcRef1 + 1, srcRef2).trim();
+                return line.substring(0, srcRef1 + 1) + this.baseUrl + src + line.substring(srcRef2);
+            }
+        }
     }
 };
 
