@@ -5,18 +5,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HOME</title>
+    <link rel="stylesheet" href="./engine/markdown-html.css" type="text/css">
 </head>
 
 <body>
-    <div id='markdown-container' resource="https://madokast.github.io/draft/markdown-learn.md"></div>
+    <a onclick="render(event)" resource="https://madokast.github.io/draft/markdown-learn.md">markdown-learn</a>
+    <div id="container"></div>
 </body>
 
 <script src="./engine/markdown-render.js"></script>
 <script>
-    console.log(MarkdownRender);
-    var container = document.getElementById('markdown-container');
-    var url = container.getAttribute('resource');
-    MarkdownRender.render(url, container);
+    function render(event){
+        var a = event.srcElement;
+        var url = a.getAttribute('resource');
+        var container = document.getElementById('container');
+        MarkdownRender.render(url, container);
+    }
 </script>
 
 </html>

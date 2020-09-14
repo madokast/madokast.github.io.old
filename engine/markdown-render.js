@@ -10,7 +10,7 @@ var MarkdownRender = {
         HTML_LI: ['<li>', '</li>'],
         HTML_STRONG: ['<strong>', '</strong>'],
         HTML_EM: ['<em>', '</em>'],
-        HTML_INLINE_CODE: ['<span class="markdown-inline-code">', '</span>'],
+        HTML_INLINE_CODE: ['<span class="markdown-inline-code" >', '</span>'],
         MD_STRONG: '**',
         MD_EM: '*',
         MD_INLINE_CODE: '`',
@@ -23,8 +23,8 @@ var MarkdownRender = {
         MARKDOWM_HTML: 7,
         HTMLS: undefined // json 内无法引用内部变量 https://www.imooc.com/wenda/detail/571609 
     },
-    markDownUrl: null,
-    baseUrl: null,
+    markDownUrl: '',
+    baseUrl: '',
     // 发送请求，渲染 markdown
     // url markdown文档地址
     // container 渲染目的地dom
@@ -248,15 +248,17 @@ var MarkdownRender = {
 
     },
     // 渲染 html
+    // 主要是渲染 src
     solveHTML: function (line) {
         // <img src="./small.png" alt="图片名称"/>
         var srcIndex = line.indexOf('src');
         if (srcIndex != -1) {
             var srcRef1 = line.indexOf('"', srcIndex);
-            var srcRef2 = srcRef1 == -1 ? -1 : line.indexOf('"', srcRef1);
+            var srcRef2 = srcRef1 == -1 ? -1 : line.indexOf('"', srcRef1 + 1);
             if (srcRef2 != -1) {
                 var src = line.substring(srcRef1 + 1, srcRef2).trim();
-                return line.substring(0, srcRef1 + 1) + this.baseUrl + src + line.substring(srcRef2);
+                // console.log('src = ' + src);
+                return line.substring(0, srcRef1 + 1) + this.baseUrl + '/' + src + line.substring(srcRef2);
             }
         }
     }

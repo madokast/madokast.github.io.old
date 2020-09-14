@@ -1,0 +1,9 @@
+body{
+    width: 880px;
+    margin:auto;
+}
+
+.markdown-inline-code{
+    background-color: rgb(224, 224, 224);
+    font-family: monospace;
+}
