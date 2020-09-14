@@ -9,7 +9,11 @@
 </head>
 
 <body>
-    <a onclick="render(event)" resource="https://madokast.github.io/draft/markdown-learn.md">markdown-learn</a>
+    <a onclick="render(event)" resource="./draft/markdown-learn.md">markdown-learn</a>
+    <br>
+    <a onclick="render(event)" resource="books/DiscreteMathematicsAndIteApplications/01基础：逻辑和证明.md">基础：逻辑和证明</a>
+    <br>
+    <a onclick="render(event)" resource="others/debug/记一次中间件导致的慢SQL排查过程/记一次中间件导致的慢SQL排查过程.md">记一次中间件导致的慢SQL排查过程</a>
     <div id="container"></div>
 </body>
 
@@ -19,7 +23,7 @@
         var a = event.srcElement;
         var url = a.getAttribute('resource');
         var container = document.getElementById('container');
-        MarkdownRender.render(url, container);
+        MarkdownRender.render('https://madokast.github.io/' + url, container);
     }
 </script>
 
