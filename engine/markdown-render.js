@@ -4,7 +4,7 @@ var MarkdownRender = {
         HTML_H2: ['<h2>', '</h2>'],
         HTML_H3: ['<h3>', '</h3>'],
         HTML_P: ['<p>', '</p>'],
-        HTML_PRE: ['<pre>', '</pre>'],
+        HTML_PRE: ['<div class="markdown-multiline-code"><pre>', '</pre></div>'],
         HTML_UL: ['<ul>', '</ul>'],
         HTML_OL: ['<ol>', '</ol>'],
         HTML_LI: ['<li>', '</li>'],

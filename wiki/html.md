@@ -36,3 +36,27 @@
 - tabindex。Tab次序。
 - title。额外信息，鼠标悬浮显示提示。
 - translate。无浏览器支持。
+
+# 标签/元素
+
+## 文档和元数据
+
+DOCTYPR、html、head、body、link、meta、script、noscript、style、title
+
+## 文本元素
+a、b、br、code、del、em、i、small、sub、sup
+
+## 分组元素
+blockquote、div、li、ol、ul、p、pre
+
+## 内容元素（主要HTML5）
+h1~h6、article、aside、footer、header、section
+
+## 表格元素
+略
+
+## 表单元素
+略
+
+## 嵌入元素
+audio、canvas、img、video
