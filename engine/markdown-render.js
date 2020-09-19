@@ -21,7 +21,7 @@ var MarkdownRender = {
         MARKDOWM_ORDER_LIST: 5,
         MARKDOWM_UNORDER_LIST: 6,
         MARKDOWM_HTML: 7,
-        HTMLS: undefined // json 内无法引用内部变量 https://www.imooc.com/wenda/detail/571609 
+        HTMLS: undefined // json 内无法引用内部变量。之后赋值。 https://www.imooc.com/wenda/detail/571609 
     },
     markDownUrl: '',
     baseUrl: '',
