@@ -29,6 +29,31 @@
         #indent {
             text-indent: 2em;
         }
+
+        .pseudo:link {
+            color: #333;
+            text-decoration: none;
+        }
+
+        .pseudo:visited {
+            color: #333;
+        }
+
+        .pseudo:hover {
+            color: skyblue;
+        }
+
+        .pseudo:active {
+            color: green;
+        }
+
+        a.in{
+            display: block;
+            background-color: pink;
+            width: 150px;
+            height: 50px;
+
+        }
     </style>
 </head>
 
@@ -38,6 +63,11 @@
     <p id="align">对齐文本</p>
     <p id="under">下划线</p>
     <p id="indent">首行缩进</p>
+    <a href="#" class="pseudo">伪类选择器</a>
+    <p>元素选择模式</p>
+    <div style="width: 5px; background-color:red;">1</div>
+    <div style="width: 5px; background-color:green;">2</div>
+    <a href="#" class="in">a行内元素转为块元素</a>
 </body>
 
 </html>
