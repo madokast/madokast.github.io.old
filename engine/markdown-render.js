@@ -261,6 +261,8 @@ var MarkdownRender = {
                 var src = line.substring(srcRef1 + 1, srcRef2).trim();
                 return line.substring(0, srcRef1 + 1) + this.baseUrl + '/' + src + line.substring(srcRef2);
             }
+        } else {
+            return line;
         }
     }
 };
