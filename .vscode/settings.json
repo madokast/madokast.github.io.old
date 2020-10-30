@@ -1,3 +1,10 @@
 {
-    "python.pythonPath": "C:\\Users\\pad2020\\AppData\\Local\\Programs\\Python\\Python39\\python.exe"
+    "python.pythonPath": "C:\\Users\\pad2020\\AppData\\Local\\Programs\\Python\\Python39\\python.exe",
+    "files.exclude": {
+        "**/.classpath": true,
+        "**/.project": true,
+        "**/.settings": true,
+        "**/.factorypath": true
+    },
+    "python.formatting.provider": "black"
 }
