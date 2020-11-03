@@ -62,3 +62,86 @@ fun(a="1", b="aa0")
 
 d = {"name": "mdk", "age": 12}
 fun(**d)
+
+name = "mdk"
+
+
+def fun():
+    print(name)
+
+
+fun()
+
+
+def fun1():
+    global name
+    name += "mdk"
+    print(name)
+
+
+fun1()
+
+name = "aaa"
+
+
+def outer():
+    name = "bbb"
+    print(name)
+
+    def inner():
+        nonlocal name
+        print(name)
+
+    return inner
+
+
+r = outer()
+r()
+
+
+def getFun():
+    innerVar = 0
+
+    def fun():
+        nonlocal innerVar
+        innerVar += 1
+        return innerVar
+
+    return fun
+
+
+def getFun2():
+    obj = {"innerVar": 0}
+
+    def fun():
+        obj["innerVar"] += 1
+        return obj["innerVar"]
+
+    obj["fun"] = fun
+    return obj
+
+
+f = getFun()
+f1 = getFun()
+print(f())
+print(f())
+print(f())
+print(f())
+
+print(f1())
+print(f1())
+print(f1())
+
+print("---------------")
+
+obj = getFun2()
+print(obj["fun"]())
+print(obj["fun"]())
+print(obj["fun"]())
+
+print(locals())
+
+map = {}
+map['self'] = {'inner':map}
+map['self1'] = map
+print(map)
