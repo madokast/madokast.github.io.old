@@ -65,6 +65,11 @@ fun(**d)
 
 name = "mdk"
 
+print('----------------------------------------------')
+
+m = {}
+print(type(m))
+
 
 def fun():
     print(name)

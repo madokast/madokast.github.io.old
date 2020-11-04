@@ -159,3 +159,6 @@ print(s)
 printType(s)
 s = frozenset(s)
 printType(s)
+
+m = {}
+print(type(m))
