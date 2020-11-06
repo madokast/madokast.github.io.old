@@ -60,3 +60,13 @@ x = np.array([2, 2, 3], dtype=np.float64)
 y = np.array([4, 5, 6], dtype=np.float64)
 z = np.cross(x, y)
 print(x, " X ", y, " = ", z)
+
+# [1. 0. 0.]  X  [0. 1. 0.]  =  [0. 0. 1.]
+# [1. 2. 3.]  X  [4. 5. 6.]  =  [-3.  6. -3.]
+# [2. 2. 3.]  X  [4. 5. 6.]  =  [-3.  0.  2.]
+
+xs = np.array([[1, 0, 0], [1, 2, 3], [2, 2, 3]], dtype=np.float64)
+ys = np.array([[0, 1, 0], [4, 5, 6], [4, 5, 6]], dtype=np.float64)
+zs = np.cross(xs, ys)
+print(xs, ys, zs, sep="\n")
+

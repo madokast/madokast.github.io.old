@@ -1,3 +1,6 @@
+from typing import overload
+
+
 print(isinstance(1, object))  # True
 
 
@@ -119,7 +122,7 @@ class Father:
 
 class Son(Father):
     def __init__(self, name: str, age: int) -> None:
-        super().__init__(name)  # 相当于Java super(val)
+        super(Son, self).__init__(name)  # 相当于Java super(val)
         self.age = age
 
     def hello(self) -> None:  # 重写方法
@@ -134,3 +137,4 @@ s.hello()
 s.fun()
 f = Father("zzz")
 f.hello()
+print(Son.__mro__)
