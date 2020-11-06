@@ -106,25 +106,31 @@ a.name = "22"
 print(a.name)
 
 
-print('-------------继承---------------')
+print("-------------继承---------------")
+
 
 class Father:
-    def __init__(self,name):
-        self.name = name 
-    def hello(self):
-        print(f'hello {self.name}')
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def hello(self) -> None:
+        print(f"hello {self.name}")
+
 
 class Son(Father):
-    def __init__(self,name,age):
-        super().__init__(name) # 相当于Java super(val)
+    def __init__(self, name: str, age: int) -> None:
+        super().__init__(name)  # 相当于Java super(val)
         self.age = age
-    def hello(self): # 重写方法
-        print(f'hello {self.name} {self.age}')
-    def fun(self):
-        print('子类的方法')
 
-s = Son('abc',12)
+    def hello(self) -> None:  # 重写方法
+        print(f"hello {self.name} {self.age}")
+
+    def fun(self) -> None:
+        print("子类的方法")
+
+
+s = Son("abc", 12)
 s.hello()
 s.fun()
-f = Father('zzz')
+f = Father("zzz")
 f.hello()
