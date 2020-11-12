@@ -19,3 +19,25 @@
 ```
 
 - 开发 CUDA 程序，需要 GPU 编译器
+
+## 安装
+
+- 安装 visual studio 2019，安装时选择"使用C++的桌面开发"，之后在安装目录搜索64位的 C/C++ 编译器 cl.exe，把目录加入 path 环境变量。
+
+```
+典型 cl.exe 目录
+C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.27.29110\bin\Hostx64\x64
+```
+
+- 安装 NVIDIA 驱动程序，https://www.nvidia.cn/geforce/drivers/ ，完成驱动更新。
+
+- 在 NVIDIA control panel 软件中，查看 CUDA 的版本，方法如下。图片中 CUDA 版本为11.1
+  
+<img src="./img/NVIDIA_control_panel_main.jpg"></img>
+
+<img src="./img/NVIDIA_control_panel_sys_info.jpg"></img>
+
+- 安装 CUDA 开发工具，https://developer.nvidia.com/cuda-zone ，选择对应的版本。历史版本见 https://developer.nvidia.com/cuda-toolkit-archive 
+
+- 安装 pycuda，`pip install -i https://pypi.tuna.tsinghua.edu.cn/simple pycuda`
+
