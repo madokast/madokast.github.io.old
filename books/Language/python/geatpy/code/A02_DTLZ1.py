@@ -67,18 +67,18 @@ NDSet.ObjV为最优解个体的目标函数值；NDSet.Phen为对应的决策变
 详见Population.py中关于种群类的定义。
 """
 [NDSet, population] = myAlgorithm.run() # 执行算法模板，得到非支配种群以及最后一代种群
-NDSet.save()  # 把非支配种群的信息保存到文件中
+# NDSet.save()  # 把非支配种群的信息保存到文件中
 """==================================输出结果=============================="""
 print('用时：%f 秒' % myAlgorithm.passTime)
 print('评价次数：%d 次' % myAlgorithm.evalsNum)
 print('非支配个体数：%d 个' % NDSet.sizes) if NDSet.sizes != 0 else print('没有找到可行解！')
-if myAlgorithm.log is not None and NDSet.sizes != 0:
-    print('GD', myAlgorithm.log['gd'][-1])
-    print('IGD', myAlgorithm.log['igd'][-1])
-    print('HV', myAlgorithm.log['hv'][-1])
-    print('Spacing', myAlgorithm.log['spacing'][-1])
-    """=========================进化过程指标追踪分析========================="""
-    metricName = [['igd'], ['hv']]
-    Metrics = np.array([myAlgorithm.log[metricName[i][0]] for i in range(len(metricName))]).T
+# if myAlgorithm.log is not None and NDSet.sizes != 0:
+#     print('GD', myAlgorithm.log['gd'][-1])
+#     print('IGD', myAlgorithm.log['igd'][-1])
+#     print('HV', myAlgorithm.log['hv'][-1])
+#     print('Spacing', myAlgorithm.log['spacing'][-1])
+#     """=========================进化过程指标追踪分析========================="""
+    # metricName = [['igd'], ['hv']]
+    # Metrics = np.array([myAlgorithm.log[metricName[i][0]] for i in range(len(metricName))]).T
     # 绘制指标追踪分析图
-    ea.trcplot(Metrics, labels=metricName, titles=metricName)
+    # ea.trcplot(Metrics, labels=metricName, titles=metricName)
