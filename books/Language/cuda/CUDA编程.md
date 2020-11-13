@@ -41,3 +41,12 @@ C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.2
 
 - 安装 pycuda，`pip install -i https://pypi.tuna.tsinghua.edu.cn/simple pycuda`
 
+## GPU 架构
+
+- SM 流多处理器，下有若干 SP 核心。
+
+- 每 32 个线程共享指令。
+
+## 注意事项
+
+不要多个线程访问同一个地址！这样会发生冲突。
