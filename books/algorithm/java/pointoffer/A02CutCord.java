@@ -1,4 +1,4 @@
-package books.java.algorithm.pointoffer;
+package books.algorithm.java.pointoffer;
 
 /**
  * 绳子长度 len 切成 part 份 问切完后绳子每段长度相乘的最大值 max(Πlen[i])

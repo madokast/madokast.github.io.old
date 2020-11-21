@@ -1,9 +1,6 @@
-package books.java.algorithm.leetcode.L300;
+package books.algorithm.java.leetcode.L300;
 
 import java.util.Arrays;
-
-import books.java.algorithm.leetcode.LeetCode;
-import books.java.algorithm.leetcode.Run;
 
 /**
  * 给定一个无序的整数数组，找到其中最长上升子序列的长度。
@@ -20,7 +17,6 @@ import books.java.algorithm.leetcode.Run;
  * 著作权归领扣网络所有。商业转载请联系官方授权，非商业转载请注明出处。
  */
 
-@LeetCode
 public class L0300LongestIncreasingSubsequence {
     public static void main(String[] args) {
         L0300LongestIncreasingSubsequence a = new L0300LongestIncreasingSubsequence();
@@ -28,7 +24,6 @@ public class L0300LongestIncreasingSubsequence {
         System.out.println(a.lengthOfLIS(new int[] { 1, 3, 6, 7, 9, 4, 10, 5, 6 })); // 6
     }
 
-    @Run
     private int lengthOfLIS(int[] nums) {
         if (nums == null || nums.length == 0)
             return 0;

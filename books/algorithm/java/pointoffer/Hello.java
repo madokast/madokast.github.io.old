@@ -1,4 +1,4 @@
-package books.java.algorithm.pointoffer;
+package books.algorithm.java.pointoffer;
 
 public class Hello {
     public static void main(String[] args) {

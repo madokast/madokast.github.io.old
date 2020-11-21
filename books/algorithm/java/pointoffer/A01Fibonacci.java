@@ -1,4 +1,4 @@
-package books.java.algorithm.pointoffer;
+package books.algorithm.java.pointoffer;
 
 /**
  * 类似问题，青蛙跳台阶
