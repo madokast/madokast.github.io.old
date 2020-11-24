@@ -1,4 +1,4 @@
-package books.java.others;
+package books.language.java.others;
 
 public class TimeTest {
     public static void main(String[] args) {
