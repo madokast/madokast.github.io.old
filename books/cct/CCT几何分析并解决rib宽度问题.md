@@ -91,10 +91,48 @@ X 轴方向，可以用 Y 轴叉乘 S 轴求得 **x** = **y**×**s** =
 
 </div>
 
-## 直线
+## 螺线核、CCT 核
 
-1. 圆柱面上的 CCT，二维对比
+CCT 先研究最简单的直线 CCT，如果不考虑绕线时向 z 轴方向的移动，CCT 的本质如下
 
-2. 直线 CCT 的 rib 求法
+1. 螺线核
 
-## 圆环面
+路径方程，二维 **P**(t) = (t, z0)，三维 **P**(t) = (rcos(t), rsin(t), z0)
+
+<img src="./img/D01左二右三_匝间距0_螺线-min.gif"></img>
+
+2. 二极 CCT 核
+
+路径方程，二维 **P**(t) = (k0sin(t), z0)，三维 **P**(t) = (rcos(k0sin(t)), rsin(k0sin(t)), z0)
+
+<img src="./img/D02左二维有圆柱三维_无匝间二极CCT-min.gif"></img>
+<img src="./img/D04左二维有圆柱三维_无匝间螺线变二极CCT-min.gif"></img>
+
+3. 四级 CCT 核
+
+路径方程，二维 **P**(t) = (k1sin(2t), z0)，三维 **P**(t) = (rcos(k1sin(2t)), rsin(k1sin(2t)), z0)
+
+<img src="./img/D03左二维有圆柱三维_无匝间四极CCT-min.gif"></img>
+<img src="./img/D05左二维有圆柱三维_无匝间螺线变四极CCT-min.gif"></img>
+<img src="./img/D05左二维有圆柱三维_无匝间螺线变四极CCT_视角2-min.gif"></img>
+
+4. 多级 CCT 核
+
+<img src="./img/D05左二维有圆柱三维_无匝间螺线变二四极CCT-min.gif"></img>
+
+5. CCT = CCT 核 + Z 轴平移
+
+<img src="./img/E01左二维有圆柱三维_有匝间二极CCT-min.gif"></img>
+<img src="./img/E02左二维有圆柱三维_有匝间四极CCT-min.gif"></img>
+
+## CCT rib 研究
+
+见 books\cct\圆柱直螺线管rib宽度公式推导.docx 
+
+## 二维三维映射的意义
+
+主要用于设计AGCCT，弄清楚每段 CCT 之间的关系
+
+<img src="./img/F01左二维有圆柱三维_AGCCT设计-min.gif"></img>
+
+

@@ -1,5 +1,5 @@
 """
-2020年11月24日 FIXED 禁止修改
+2020年11月25日 FIXED 禁止修改
 用于 books\cct\CCT几何分析并解决rib宽度问题.md
 
 增加坐标 x y z
@@ -12,7 +12,7 @@ from matplotlib import cm
 import numpy as np
 import matplotlib.animation as animation
 
-fig = plt.figure(figsize=(11,4.8))
+fig = plt.figure(figsize=(11, 4.8))
 # 绝对坐标系，确定绘图板位置
 ax = plt.axes([0.15, 0.10, 0.35, 0.80])
 ax3 = plt.axes([0.5, -0.05, 0.6, 1.3], projection="3d")
@@ -26,13 +26,21 @@ ksi_number = 500
 # 圆柱轴向分段 注意 Y 方向是圆柱轴向
 z_number = 500
 
-# 螺线
+# CCT
 number = 720
 theta_steps = np.linspace(0, 2 * 2 * np.pi, number)
-z0 = 1.0
+z0 = 0.5
+start_z = 0.5
+c0 = 0.0
+c1 = 0.3
 # 二维螺线
 x2 = theta_steps
-y2 = z0 / (2 * np.pi) * theta_steps
+y2 = (
+    z0 / (2 * np.pi) * theta_steps
+    + start_z
+    + c0 * np.sin(theta_steps)
+    + c1 * np.sin(2 * theta_steps)
+)
 # 三维螺线
 x3 = r * np.cos(theta_steps)
 z3 = r * np.sin(theta_steps)
@@ -40,8 +48,8 @@ y3 = y2
 
 ax.plot(x2, y2, "r-")
 ax3.plot(x3[0 : 90 + 40], y3[0 : 90 + 40], z3[0 : 90 + 40], "r-")
-ax3.plot(x3[90:300], y3[90:300], z3[90:300], "r--")
-ax3.plot(x3[300 : 450 + 40], y3[300 : 450 + 40], z3[300 : 450 + 40], "r-")
+ax3.plot(x3[90:320], y3[90:320], z3[90:320], "r--")
+ax3.plot(x3[320 : 450 + 40], y3[320 : 450 + 40], z3[320 : 450 + 40], "r-")
 ax3.plot(x3[450:660], y3[450:660], z3[450:660], "r--")
 ax3.plot(x3[660:], y3[660:], z3[660:], "r-")
 
@@ -58,15 +66,14 @@ if True:
         point_ani_3d.set_data(x3[index], y3[index])
         point_ani_3d.set_3d_properties(z3[index])
         return point_ani_3d
-    
+
     def update(index):
         update_2d(index)
         update_3d(index)
-        return point_ani_2d,point_ani_3d
-
+        return point_ani_2d, point_ani_3d
 
     ani = animation.FuncAnimation(
-        fig, update, np.arange(0, number, 2), interval=10, blit=True
+        fig, update, np.arange(0, number, 5), interval=10, blit=True
     )
 
 
@@ -80,8 +87,8 @@ if True:
     ax.set_xlim(-2.5 * 2 * np.pi, 2.5 * 2 * np.pi)
     ax.set_ylim(-4, 4)
 
-    ax.text(15,-1,"θ",fontsize=15)
-    ax.text(1,4,"z",fontsize=15)
+    ax.text(15, -1, "θ", fontsize=15)
+    ax.text(1, 4, "z", fontsize=15)
 
 # 绘制三维圆柱 （2020年11月24日 加上视角）
 if True:
@@ -103,25 +110,27 @@ if True:
     ax3.plot3D(2, 0, 2)
 
     # 坐标
-    ax3.plot3D([0, r*2], [0, 0], [0, 0], color="k", lw=0.8)
-    ax3.plot3D([0, 0], [0, 0], [0, r*2], color="k", lw=0.8)
+    ax3.plot3D([0, r * 2], [0, 0], [0, 0], color="k", lw=0.8)
+    ax3.plot3D([0, 0], [0, 0], [0, r * 2], color="k", lw=0.8)
     ax3.plot3D([0, 0], [0, length], [0, 0], color="k", lw=0.8)
 
     plt.axis("off")
     ax3.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
 
     # 设置摄像机位置（实际上是设置坐标轴范围）
-    ax3.set_xlim3d(-1.5,1.5)
-    ax3.set_ylim3d(0.5,3.5)
-    ax3.set_zlim3d(-1.2,1.2)
+    ax3.set_xlim3d(-1.5, 1.5)
+    ax3.set_ylim3d(0.5, 3.5)
+    ax3.set_zlim3d(-1.2, 1.2)
+
+    # 设置摄像机方位角
+    ax3.view_init(elev=43, azim=-26)
 
     # 文字
-    ax3.text(0,3,0,'z',(0,1,0),fontsize=15)
-    ax3.text(2*r,0,0,'y',(1,0,0),fontsize=15)
-    ax3.text(0,0,r*2,'x',(0,0,0),fontsize=15)
-
+    ax3.text(0, 3, 0, "z", (0, 1, 0), fontsize=15)
+    ax3.text(2 * r, 0, 0, "y", (1, 0, 0), fontsize=15)
+    ax3.text(0, 0, r * 2, "x", (0, 0, 0), fontsize=15)
 
 
 # 保存动画
-# ani.save('books\cct\img\C01左二维有圆柱三维_螺线_动画.gif', writer='imagemagick', fps=100)
+# ani.save("books\cct\img\E02左二维有圆柱三维_有匝间四极CCT.gif", writer="imagemagick", fps=100)
 plt.show()
