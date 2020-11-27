@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import pycuda.driver as drv
 import pycuda.autoinit
+import pycuda.driver as drv
 from pycuda.compiler import SourceModule
 
 mod = SourceModule("""
