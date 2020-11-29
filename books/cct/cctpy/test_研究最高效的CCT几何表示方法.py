@@ -35,3 +35,9 @@ cct = CCT(
 m = cct.magnetic_field_at(P3())
 
 print(m)
+
+import time
+s = time.time()
+for p in BaseUtils.linspace(P3(),P3(y=2),500):
+    print(cct.magnetic_field_at(p))
+print(time.time()-s)

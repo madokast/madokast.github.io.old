@@ -9,10 +9,10 @@ import numpy
 
 
 GPU_ON = False
-# 不使用 GPU 可以注释下面三行
-import pycuda.autoinit
-import pycuda.driver as drv
-from pycuda.compiler import SourceModule
+if GPU_ON:
+    import pycuda.autoinit
+    import pycuda.driver as drv
+    from pycuda.compiler import SourceModule
 
 M: float = 1.0
 MM: float = 0.001
@@ -60,9 +60,13 @@ class BaseUtils:
                     raise AssertionError(msg)
 
     @staticmethod
-    def linspace(start: float, end: float, number: int) -> List[float]:
-        d = (end - start) / (number - 1)
-        return [start + d * i for i in range(number)]
+    def linspace(start, end, number: int) -> List:
+        # 除法改成乘法以适应 P2 P3 对象
+        d = (end - start) * (1/(number - 1)) 
+        # i 转为浮点以适应 P2 P3 对象
+        return [start + d * float(i) for i in range(number)]
+        
+
 
     @staticmethod
     def angle_to_radian(deg):

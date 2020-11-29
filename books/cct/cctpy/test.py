@@ -3,7 +3,7 @@ import random
 
 import numpy as np
 
-from cctpy import BaseUtils, P2, P3, StraightLine2, Trajectory, Plot3, CCT, LocalCoordinateSystem, MM
+from cctpy import GPU_ON, BaseUtils, P2, P3, StraightLine2, Trajectory, Plot3, CCT, LocalCoordinateSystem, MM
 
 
 class AssertCase(unittest.TestCase):
@@ -409,8 +409,9 @@ class CCTTestCase(unittest.TestCase):
         self.assertEqual(m,P3(0.0031436355039083964, -0.00470478301086915, 0.00888627084434009))
         m = cct.magnetic_field_at_cpu(P3.origin())
         self.assertEqual(m,P3(0.0031436355039083964, -0.00470478301086915, 0.00888627084434009))
-        m = cct.magnetic_field_at_gpu(P3.origin())
-        self.assertEqual(m,P3(0.0031436355039083964, -0.00470478301086915, 0.00888627084434009))
+        if GPU_ON:
+            m = cct.magnetic_field_at_gpu(P3.origin())
+            self.assertEqual(m,P3(0.0031436355039083964, -0.00470478301086915, 0.00888627084434009))
 
 if __name__ == '__main__':
     unittest.main()
