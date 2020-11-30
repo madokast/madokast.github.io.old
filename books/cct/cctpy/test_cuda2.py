@@ -135,7 +135,7 @@ __global__ void magnet_solo_cct(float *winding, float *p, int *length, float *re
 }"""
 )
 
-magnet = mod.get_function("magnet")
+magnet = mod.get_function("magnet_solo_cct")
 
 cct = CCT(
     LocalCoordinateSystem.global_coordinate_system(),
@@ -150,36 +150,10 @@ cct = CCT(
 )
 
 length = int(cct.dispersed_path3.shape[0])
-
-print(f"len={length}")
-
 winding = cct.dispersed_path3.flatten().astype(np.float32)
 
 
 ret = np.empty((3,), dtype=np.float32)
-
-p = np.array([0.0, 0.0, 0.0]).astype(np.float32)
-magnet(
-    drv.In(winding),
-    drv.In(p),
-    drv.In(np.array([length]).astype(np.int32)),
-    drv.Out(ret),
-    block=(512, 1, 1),
-    grid=(250, 1),
-)
-
-print(ret)
-
-print(ret * cct.current * 1e-7)
-
-###################### time ###############
-print("--------")
-m = cct.magnetic_field_at_cpu(P3())
-print(m)
-m = cct.magnetic_field_at_gpu(P3())
-print(m)
-
-print("--------------------------------")
 
 ###################### time ###############
 import time
@@ -207,6 +181,16 @@ for x in np.linspace(0, 0.01, times):
     m = cct.magnetic_field_at_cpu(p)
     print(m, p)
 print(f"CPU-d={time.time()-s}")
+
+#################
+s = time.time()
+for x in np.linspace(0, 0.01, times):
+    p = P3(x, 0, 0)
+    m = cct.magnetic_field_at(p)
+    print(m, p)
+    m = cct.magnetic_field_at(p)
+    print(m, p)
+print(f"GPUINNER-d={time.time()-s}")
 
 #################
 s = time.time()

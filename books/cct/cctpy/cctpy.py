@@ -1,38 +1,52 @@
 """
-CCT 建模 all in one
+CCT 建模优化全套解决方案
+文档见 introduction2cctpy.ipynb
 """
 from typing import Callable, List
+from unittest.main import main
 import matplotlib.pyplot as plt
 import math
 import sys
 import numpy
 
+# 如果没有安装 CUDA 和 pycuda / 不需要 GPU 加速，可以删除下面三行
+import pycuda.autoinit
+import pycuda.driver as drv
+from pycuda.compiler import SourceModule
 
-GPU_ON = False
-if GPU_ON:
-    import pycuda.autoinit
-    import pycuda.driver as drv
-    from pycuda.compiler import SourceModule
-
-M: float = 1.0
-MM: float = 0.001
-LIGHT_SPEED: float = 299792458.0 * M
-RAD: float = 1.0
-MRAD: float = 0.001 * RAD
-J: float = 1.0
-eV = 1.6021766208e-19 * J
-MeV = 1000 * 1000 * eV
+# 常量
+M: float = 1.0  # 一米
+MM: float = 0.001  # 一毫米
+LIGHT_SPEED: float = 299792458.0 * M  # 光速
+RAD: float = 1.0  # 一弧度
+MRAD: float = 1.0 * MM * RAD  # 一毫弧度
+J: float = 1.0  # 焦耳
+eV = 1.6021766208e-19 * J  # 电子伏特转焦耳
+MeV = 1000 * 1000 * eV  # 兆电子伏特
 MeV_PER_C = 5.3442857792e-22  # kg m/s 动量单位
 
 
 class BaseUtils:
+    """
+    这里存放一些简单的工具，如
+    1. 判断两个对象是否相等
+    2. numpy 中用于生成均匀分布的 linspace 方法
+    3. 角度转弧度 angle_to_radian 和 弧度转角度 radian_to_angle
+    4. 打印函数调用栈 print_traceback （这个主要用于 debug）
+    5. 椭圆。用于生成椭圆圆周上均匀分布的若干点
+    """
+
     @staticmethod
-    def equal(a, b, err=1e-6, msg: str = None):
+    def equal(a, b, err: float = 1e-6, msg: str = None) -> bool:
         """
         判断 a b 是否相等，相等返回 true
         当 a b 不相等时，若 msg 为空，返回 flase，否则抛出异常，异常信息即 msg
+
+        示例：
         """
-        if isinstance(a, float) and isinstance(b, float):
+        if (isinstance(a, float) or isinstance(a, int)) and (
+            isinstance(b, float) or isinstance(b, int)
+        ):
             if a == b or abs(a - b) <= err or 2 * abs((a - b) / (a + b)) <= err:
                 return True
             else:
@@ -61,12 +75,13 @@ class BaseUtils:
 
     @staticmethod
     def linspace(start, end, number: int) -> List:
+        """
+        同 numpy 的 linspace
+        """
         # 除法改成乘法以适应 P2 P3 对象
-        d = (end - start) * (1/(number - 1)) 
+        d = (end - start) * (1 / (number - 1))
         # i 转为浮点以适应 P2 P3 对象
         return [start + d * float(i) for i in range(number)]
-        
-
 
     @staticmethod
     def angle_to_radian(deg):
@@ -74,6 +89,15 @@ class BaseUtils:
             return deg / 180.0 * math.pi
         elif isinstance(deg, List):
             return [BaseUtils.angle_to_radian(d) for d in deg]
+        else:
+            raise NotImplementedError
+
+    @staticmethod
+    def radian_to_angle(rad):
+        if isinstance(rad, float) or isinstance(rad, int):
+            return rad * 180.0 / math.pi
+        elif isinstance(rad, List):
+            return [BaseUtils.radian_to_angle(d) for d in rad]
         else:
             raise NotImplementedError
 
@@ -97,10 +121,10 @@ class BaseUtils:
         """
 
         def __init__(self, A: float, B: float, C: float, D: float):
-            self.A = A
-            self.B = B
-            self.C = C
-            self.D = D
+            self.A = float(A)
+            self.B = float(B)
+            self.C = float(C)
+            self.D = float(D)
 
         def point_at(self, theta: float):
             """
@@ -212,7 +236,7 @@ class P2:
 
     def normalize(self):
         """
-        正则化，返回新矢量
+        矢量长度归一，返回新矢量
         """
         return self * (1 / self.length())
 
@@ -295,17 +319,28 @@ class P2:
         矢量乘标量，各元素相乘，返回新矢量
         矢量乘矢量，内积，返回标量
         """
-        if isinstance(other, float):
+        if isinstance(other, float) or isinstance(other, int):
             return P2(self.x * other, self.y * other)
         else:
             return self.x * other.x + self.y * other.y
 
+    def __rmul__(self, other):
+        """
+        当左操作数不支持相应的操作时被调用
+        """
+        return self.__mul__(other)
+
     def angle_to(self, other) -> float:
         """
-        矢量 self 和 另一个矢量 other 的夹角
+        矢量 self 到 另一个矢量 other 的夹角
         """
-        theta = (self * other) / (self.length() * other.length())
-        return float(math.acos(theta))
+        to_x = self.angle_to_x_axis()
+        s = self.rotate(-to_x)
+        o = other.rotate(-to_x)
+        return o.angle_to_x_axis()
+        # 下面求的仅仅是 矢量 self 和 另一个矢量 other 的夹角
+        # theta = (self * other) / (self.length() * other.length())
+        # return math.acos(theta)
 
     def to_p3(self, transformation: Callable = lambda p2: P3(p2.x, p2.y, 0.0)):
         """
@@ -318,7 +353,13 @@ class P2:
         """
         用于打印矢量值
         """
-        return f"P2:x({self.x})y({self.y})"
+        return f"[{self.x}, {self.y}]"
+
+    def __repr__(self) -> str:
+        """
+        == __str__ 用于打印矢量值
+        """
+        return self.__str__()
 
     def __eq__(self, other, err=1e-6, msg=None):
         """
@@ -423,10 +464,16 @@ class P3:
         矢量乘标量，各元素相乘，返回新矢量
         矢量乘矢量，内积，返回标量
         """
-        if isinstance(other, float):
+        if isinstance(other, float) or isinstance(other, int):
             return P3(self.x * other, self.y * other, self.z * other)
         else:
             return self.x * other.x + self.y * other.y + self.z * other.z
+
+    def __rmul__(self, other):
+        """
+        当左操作数不支持相应的操作时被调用
+        """
+        return self.__mul__(other)
 
     def __matmul__(self, other):
         """
@@ -438,13 +485,16 @@ class P3:
             self.x * other.y - self.y * other.x,
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         """
         矢量信息
         """
-        return f"P3:x({self.x})y({self.y})z({self.z})"
+        return f"[{self.x}, {self.y}, {self.z}]"
 
-    def __eq__(self, other, err=1e-6, msg=None):
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    def __eq__(self, other, err=1e-6, msg=None) -> bool:
         """
         矢量相等判断
         """
@@ -481,6 +531,12 @@ class P3:
     def from_numpy_ndarry3(array3: numpy.ndarray):
         return P3(array3[0], array3[1], array3[2])
 
+    def to_numpy_ndarry3(self) -> numpy.ndarray:
+        return numpy.array(self.to_list())
+
+    def to_numpy_ndarry3_float32(self) -> numpy.ndarray:
+        return numpy.array(self.to_list(), dtype=numpy.float32)
+
 
 class Magnet:
     """
@@ -502,7 +558,7 @@ class Magnet:
         """
         raise NotImplementedError
 
-    def magnetic_field_along(self, line) -> List[P3]:
+    def magnetic_field_along(self, line, step: float = 1 * MM) -> List[P3]:
         """
         计算本对象在三维曲线 line 上的磁场分布
         ----------
@@ -514,14 +570,27 @@ class Magnet:
         if isinstance(line, List):
             return [self.magnetic_field_at(p) for p in line]
         elif isinstance(line, Line2):
-            return self.magnetic_field_along(line.disperse3d())
+            return self.magnetic_field_along(line.disperse3d(step))
         else:
             raise NotImplementedError
 
 
+class BeamlineObject:
+    """
+    表示束线上的一个对象，可以判断点 point 是在这个对象的孔径内还是孔径外
+    """
+    def is_out_of_aperture(point: P3) -> bool:
+        """
+        判断点 point 是在这个对象的孔径内还是孔径外
+        """
+        raise NotImplementedError
+
+
 class LocalCoordinateSystem:
     """
-    局部坐标系，各种磁铁都放置在局部坐标系中，而粒子在全局坐标系中运动，为了求磁铁在粒子位置产生的磁场，需要引入坐标变换
+    局部坐标系。
+    各种磁铁都放置在局部坐标系中，而粒子在全局坐标系中运动，
+    为了求磁铁在粒子位置产生的磁场，需要引入局部坐标的概念和坐标变换
     """
 
     def __init__(
@@ -580,49 +649,10 @@ class LocalCoordinateSystem:
         """
 
         return self.location + (
-            local_coordinate_point.x * self.XI
-            + local_coordinate_point.y * self.YI
-            + local_coordinate_point.z * self.ZI
+            self.XI * local_coordinate_point.x
+            + self.YI * local_coordinate_point.y
+            + self.ZI * local_coordinate_point.z
         )
-
-    def line_to_local_coordinate(self, global_coordinate_line: List[P3]) -> List[P3]:
-        """
-        全局坐标系中的 线/点集 坐标转为局部坐标系
-        线/点集，为 n*3 的矩阵，矩阵每一行代表一个点
-        Parameters
-        ----------
-        global_coordinate_line 全局坐标系中的 线/点集
-
-        Returns 转为局部坐标系
-        -------
-
-        """
-        return [self.point_to_local_coordinate(p) for p in global_coordinate_line]
-
-    def line_to_global_coordinate(self, local_coordinate_line: List[P3]) -> List[P3]:
-        """
-        局部坐标系中的 线/点集 坐标转为全局坐标系
-        线/点集，为 n*3 的矩阵，矩阵每一行代表一个点
-        Parameters
-        ----------
-        local_coordinate_line 局部坐标系中的 线/点集
-
-        Returns 转为全局坐标系
-        -------
-
-        """
-        return [self.point_to_global_coordinate(p) for p in local_coordinate_line]
-
-    def set_direction(self, z_direction: P3, x_direction: P3) -> None:
-        BaseUtils.equal(
-            z_direction * x_direction,
-            0.0,
-            msg="LocalCoordinateSystem:set_direction异常，"
-            + f"z_direction{z_direction}x_direction{x_direction}不正交",
-        )
-        self.ZI = z_direction.copy().normalize()
-        self.XI = x_direction.copy().normalize()
-        self.YI = self.ZI @ self.XI
 
     def __str__(self) -> str:
         return f"ORIGIN={self.location}, xi={self.XI}, yi={self.YI}, zi={self.ZI}"
@@ -1553,28 +1583,6 @@ class ParticleRunner:
 
         return all_info
 
-    @staticmethod
-    def run_ps_only_cpu0(
-        ps: List[RunningParticle], m: Magnet, length: float, footstep: float = 1 * MM
-    ) -> None:
-        """
-        让粒子群 ps 在磁场 m 中运动 length 距离，步长 footstep
-        CPU 计算 单线程
-        Parameters
-        ----------
-        ps 一群粒子
-        m 磁场
-        length 运动长度
-        footstep 步长
-
-
-        Returns None
-        -------
-
-        """
-        for p in ps:
-            ParticleRunner.run_only(p, m, length, footstep)
-
 
 class PhaseSpaceParticle:
     XXP_PLANE = 1
@@ -1996,7 +2004,7 @@ class ParticleFactory:
         ]
 
 
-class CCT(Magnet):
+class CCT(Magnet,BeamlineObject):
     """
     表示一层弯曲 CCT 线圈
     """
@@ -2163,12 +2171,6 @@ class CCT(Magnet):
             return f"BipolarToroidalCoordinateSystem a({self.a})eta({self.eta})R({self.big_r})r({self.small_r})"
 
     def magnetic_field_at(self, point: P3) -> P3:
-        if GPU_ON:
-            return self.magnetic_field_at_gpu(point)
-        else:
-            return self.magnetic_field_at_cpu(point)
-
-    def magnetic_field_at_cpu(self, point: P3) -> P3:
         # point 转为局部坐标，并变成 numpy 向量
         p = numpy.array(
             self.local_coordinate_system.point_to_local_coordinate(point).to_list()
@@ -2188,139 +2190,6 @@ class CCT(Magnet):
 
         return P3.from_numpy_ndarry3(B)
 
-    def magnetic_field_at_gpu(self, point: P3) -> P3:
-        mod = SourceModule(
-            """
-        #include <stdio.h>
-        #include <math.h>
-        #include "cuda.h"
-
-        #define MM (0.001f)
-        #define DIM (3)
-        #define PI (3.1415927f)
-        #define X (0)
-        #define Y (1)
-        #define Z (2)
-
-
-        __device__ __forceinline__ void vct_cross(float *a, float *b, float *ret) {
-            ret[X] = a[Y] * b[Z] - a[Z] * b[Y];
-            ret[Y] = -a[X] * b[Z] + a[Z] * b[X];
-            ret[Z] = a[X] * b[Y] - a[Y] * b[X];
-        }
-
-        __device__ __forceinline__ void vct_add_local(float *a_local, float *b) {
-            a_local[X] += b[X];
-            a_local[Y] += b[Y];
-            a_local[Z] += b[Z];
-        }
-
-        __device__ __forceinline__ void vct_add(float *a, float *b, float *ret) {
-            ret[X] = a[X] + b[X];
-            ret[Y] = a[Y] + b[Y];
-            ret[Z] = a[Z] + b[Z];
-        }
-
-        __device__ __forceinline__ void vct_dot_a_v(float a, float *v) {
-            v[X] *= a;
-            v[Y] *= a;
-            v[Z] *= a;
-        }
-
-        __device__ __forceinline__ void vct_dot_a_v_ret(float a, float *v, float *ret) {
-            ret[X] = v[X] * a;
-            ret[Y] = v[Y] * a;
-            ret[Z] = v[Z] * a;
-        }
-
-        __device__ __forceinline__ void vct_copy(float *src, float *des) {
-            des[X] = src[X];
-            des[Y] = src[Y];
-            des[Z] = src[Z];
-        }
-
-        __device__ __forceinline__ float vct_len(float *v) {
-            return sqrtf(v[X] * v[X] + v[Y] * v[Y] + v[Z] * v[Z]);
-        }
-
-        __device__ __forceinline__ void vct_zero(float *v) {
-            v[X] = 0.0f;
-            v[Y] = 0.0f;
-            v[Z] = 0.0f;
-        }
-
-        __device__ __forceinline__ void vct_sub(float *a, float *b, float *ret) {
-            ret[X] = a[X] - b[X];
-            ret[Y] = a[Y] - b[Y];
-            ret[Z] = a[Z] - b[Z];
-        }
-
-        // 磁场计算 注意，这里计算的不是电流元的磁场，还需要乘以 电流 和 μ0/4π (=1e-7)
-        __device__ void dB(float *p0, float *p1, float *p, float *ret) {
-            float p01[DIM];
-            float r[DIM];
-            float rr;
-
-            vct_sub(p1, p0, p01); // p01 = p1 - p0
-
-            vct_add(p0, p1, r); // r = p0 + p1
-
-            vct_dot_a_v(0.5f, r); // r = (p0 + p1)/2
-
-            vct_sub(p, r, r); // r = p - r
-
-            rr = vct_len(r); // rr = len(r)
-
-            vct_cross(p01, r, ret); // ret = p01 x r
-
-            rr = 1.0f / rr / rr / rr; // changed
-
-            vct_dot_a_v(rr, ret); // rr . (p01 x r)
-        }
-
-        __global__ void magnet(float *winding, float *p, int *length, float *ret) {
-            int tid = threadIdx.x + blockIdx.x * blockDim.x;
-
-            if (tid == 0)vct_zero(ret);
-
-            __syncthreads();
-
-            if (tid < *length - 1) {
-                float *p0 = winding + tid * DIM;
-                float *p1 = winding + (tid + 1) * DIM;
-                float db[3];
-
-                dB(p0, p1, p, db);
-
-                atomicAdd(&ret[X], db[X]);
-                atomicAdd(&ret[Y], db[Y]);
-                atomicAdd(&ret[Z], db[Z]);
-            }
-        }"""
-        )
-
-        magnet = mod.get_function("magnet")
-
-        # point 转为局部坐标，并变成 numpy 向量
-        p = numpy.array(
-            self.local_coordinate_system.point_to_local_coordinate(point).to_list()
-        )
-
-        length = int(self.dispersed_path3.shape[0])
-        winding = self.dispersed_path3.flatten().astype(numpy.float32)
-        ret = numpy.empty((3,), dtype=numpy.float32)
-
-        magnet(
-            drv.In(winding),
-            drv.In(p),
-            drv.In(numpy.array([length]).astype(numpy.int32)),
-            drv.Out(ret),
-            block=(512, 1, 1),
-            grid=((length + 511) // 512, 1),
-        )
-
-        return P3.from_numpy_ndarry3(ret * self.current * 1e-7)
-
     def __str__(self):
         return (
             f"CCT: local_coordinate_system({self.local_coordinate_system})big_r({self.big_r})small_r({self.small_r})"
@@ -2330,8 +2199,76 @@ class CCT(Magnet):
         )
 
 
-class QS(Magnet):
-    pass
+class QS(Magnet,BeamlineObject):
+    """
+    硬边 QS 磁铁，由以下参数完全确定：
+
+    length 磁铁长度 / m
+    gradient 四极场梯度 / Tm-1
+    second_gradient 六极场梯度 / Tm-2
+    aperture_radius 孔径（半径） / m
+    local_coordinate_system 局部坐标系
+
+    局部坐标系的含义见下：
+
+                      ------------------------------------------
+     　               |        ② Z                             |
+                 ① ->|       ---->           ③ ↑  X            |
+      　              |                                        |
+                      ------------------------------------------
+
+    ① QS 磁铁入口中心位置，是局部坐标系的原心
+    ② 理想粒子运动方向，是局部坐标系 Z 方向
+    ③ 像空间中 X 方向
+    因此，垂直屏幕向外（向面部）是 Y 方向
+
+    """
+
+    def __init__(
+        self,
+        local_coordinate_system: LocalCoordinateSystem,
+        length: float,
+        gradient: float,
+        second_gradient: float,
+        aperture_radius: float,
+    ):
+        self.local_coordinate_system = local_coordinate_system
+        self.length = float(length)
+        self.gradient = float(gradient)
+        self.second_gradient = float(second_gradient)
+        self.aperture_radius = float(aperture_radius)
+
+    def magnetic_field_at(self, point: P3) -> P3:
+        """
+        qs 磁铁在点 point （全局坐标系点）处产生的磁场
+        """
+        # point 转为局部坐标
+        p_local = self.local_coordinate_system.point_to_local_coordinate(point)
+        x = p_local.x
+        y = p_local.y
+        z = p_local.z
+
+        # z < 0 or z > self.length 表示点 point 位于磁铁外部
+        if z < 0 or z > self.length:
+            return P3.zeros()
+        else:
+            # 以下判断点 point 是不是在孔径外，前两个 or 是为了快速短路判断，避免不必要的开方计算
+            if (
+                abs(x) > self.aperture_radius
+                or abs(y) > self.aperture_radius
+                or math.sqrt(x ** 2 + y ** 2) > self.aperture_radius
+            ):
+                return P3.zeros()
+            else:
+                # bx 和 by 分别是局部坐标系中 x 和 y 方向的磁场（局部坐标系中 z 方向是理想束流方向/中轴线反向，不会产生磁场）
+                bx = self.gradient * y + self.second_gradient * (x * y)
+                by = self.gradient * x + 0.5 * self.second_gradient * (x ** 2 - y ** 2)
+
+                # 转移到全局坐标系中
+                return (
+                    self.local_coordinate_system.XI * bx
+                    + self.local_coordinate_system.YI * by
+                )
 
 
 class Plot3:
@@ -2390,6 +2327,46 @@ class Plot3:
         Plot3.plot_ndarry3ds(cct_path3)
 
     @staticmethod
+    def plot_qs(qs: QS, describe="r-") -> None:
+        # 前中后三个圈
+        front_circle_local = [
+            P3(
+                qs.aperture_radius * math.cos(i / 180 * numpy.pi),
+                qs.aperture_radius * math.sin(i / 180 * numpy.pi),
+                0.0,
+            )
+            for i in range(360)
+        ]
+
+        mid_circle_local = [p + P3(0, 0, qs.length / 2) for p in front_circle_local]
+        back_circle_local = [p + P3(0, 0, qs.length) for p in front_circle_local]
+        # 转到全局坐标系中
+        front_circle = [
+            qs.local_coordinate_system.point_to_global_coordinate(p)
+            for p in front_circle_local
+        ]
+        mid_circle = [
+            qs.local_coordinate_system.point_to_global_coordinate(p)
+            for p in mid_circle_local
+        ]
+        back_circle = [
+            qs.local_coordinate_system.point_to_global_coordinate(p)
+            for p in back_circle_local
+        ]
+        # 画四条轴线
+        axial_direction_line_0 = [front_circle[0], back_circle[0]]
+        axial_direction_line_1 = [front_circle[90], back_circle[90]]
+        axial_direction_line_2 = [front_circle[180], back_circle[180]]
+        axial_direction_line_3 = [front_circle[270], back_circle[270]]
+        Plot3.plot_p3s(front_circle, describe)
+        Plot3.plot_p3s(mid_circle, describe)
+        Plot3.plot_p3s(back_circle, describe)
+        Plot3.plot_p3s(axial_direction_line_0, describe)
+        Plot3.plot_p3s(axial_direction_line_1, describe)
+        Plot3.plot_p3s(axial_direction_line_2, describe)
+        Plot3.plot_p3s(axial_direction_line_3, describe)
+
+    @staticmethod
     def show():
         if not Plot3.INIT:
             raise RuntimeError("Plot3::请在show前调用plot")
@@ -2444,8 +2421,195 @@ class Plot2:
         Plot2.plot_ndarry2ds(cct_path2)
 
     @staticmethod
+    def equal():
+        if not Plot2.INIT:
+            Plot2.__init()
+        plt.axis("equal")
+
+    @staticmethod
     def show():
         if not Plot2.INIT:
             raise RuntimeError("Plot2::请在show前调用plot")
 
         plt.show()
+
+
+class GPU_ACCELERETE:
+    COMPILED: bool = False  # 是否完成编译
+    CUDA_MAGNETIC_FIELD_AT_CCT: Callable = None
+
+    @staticmethod
+    def __compile():
+        if GPU_ACCELERETE.COMPILED:
+            return  # 如果已经编译完毕，直接返回
+
+        CUDA_GENERAL_CODE = """
+
+#include <stdio.h>
+#include <math.h>
+#include "cuda.h"
+
+#define MM (0.001f)
+#define DIM (3)
+#define PI (3.1415927f)
+#define X (0)
+#define Y (1)
+#define Z (2)
+
+
+__device__ __forceinline__ void vct_cross(float *a, float *b, float *ret) {
+    ret[X] = a[Y] * b[Z] - a[Z] * b[Y];
+    ret[Y] = -a[X] * b[Z] + a[Z] * b[X];
+    ret[Z] = a[X] * b[Y] - a[Y] * b[X];
+}
+
+__device__ __forceinline__ void vct_add_local(float *a_local, float *b) {
+    a_local[X] += b[X];
+    a_local[Y] += b[Y];
+    a_local[Z] += b[Z];
+}
+
+__device__ __forceinline__ void vct_add(float *a, float *b, float *ret) {
+    ret[X] = a[X] + b[X];
+    ret[Y] = a[Y] + b[Y];
+    ret[Z] = a[Z] + b[Z];
+}
+
+__device__ __forceinline__ void vct_dot_a_v(float a, float *v) {
+    v[X] *= a;
+    v[Y] *= a;
+    v[Z] *= a;
+}
+
+__device__ __forceinline__ void vct_dot_a_v_ret(float a, float *v, float *ret) {
+    ret[X] = v[X] * a;
+    ret[Y] = v[Y] * a;
+    ret[Z] = v[Z] * a;
+}
+
+__device__ __forceinline__ void vct_copy(float *src, float *des) {
+    des[X] = src[X];
+    des[Y] = src[Y];
+    des[Z] = src[Z];
+}
+
+__device__ __forceinline__ float vct_len(float *v) {
+    return sqrtf(v[X] * v[X] + v[Y] * v[Y] + v[Z] * v[Z]);
+}
+
+__device__ __forceinline__ void vct_zero(float *v) {
+    v[X] = 0.0f;
+    v[Y] = 0.0f;
+    v[Z] = 0.0f;
+}
+
+__device__ __forceinline__ void vct_sub(float *a, float *b, float *ret) {
+    ret[X] = a[X] - b[X];
+    ret[Y] = a[Y] - b[Y];
+    ret[Z] = a[Z] - b[Z];
+}
+
+// 磁场计算 注意，这里计算的不是电流元的磁场，还需要乘以 电流 和 μ0/4π (=1e-7)
+// p0 和 p1 构成电流元左右端点，计算电流元在 p 点产生的磁场，返回值写入 ret 中
+__device__ void dB(float *p0, float *p1, float *p, float *ret) {
+    float p01[DIM];
+    float r[DIM];
+    float rr;
+
+    vct_sub(p1, p0, p01); // p01 = p1 - p0
+
+    vct_add(p0, p1, r); // r = p0 + p1
+
+    vct_dot_a_v(0.5f, r); // r = (p0 + p1)/2
+
+    vct_sub(p, r, r); // r = p - r
+
+    rr = vct_len(r); // rr = len(r)
+
+    vct_cross(p01, r, ret); // ret = p01 x r
+
+    rr = 1.0f / rr / rr / rr; // changed
+
+    vct_dot_a_v(rr, ret); // rr . (p01 x r)
+}
+
+    """
+
+        CUDA_MAGNET_SOLO_CCT = """
+
+// 计算单个 CCT 产生的磁场，winding 表示 CCT 路径离散点
+// 因为 CUDA 只支持一维数组，winding[0]、winding[1]、winding[2]，表示第一个点
+// winding[3]、winding[4]、winding[5] 表示第二个点
+// length 表示点的数目
+// 计算 CCT 在 p 点产生的磁场，返回值存入 ret 中
+// 注意实际磁场还要乘上电流和 μ0/4π (=1e-7)
+__global__ void magnet_solo_cct(float *winding, float *p, int *length, float *ret) {
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (tid == 0){
+        vct_zero(ret);
+        printf("\\%f,\\%f,\\%f\\n",p[0],p[1],p[2]);
+    }
+
+    __syncthreads();
+
+    if (tid < *length - 1) {
+        float *p0 = winding + tid * DIM;
+        float *p1 = winding + (tid + 1) * DIM;
+        float db[3];
+
+        dB(p0, p1, p, db);
+
+        atomicAdd(&ret[X], db[X]);
+        atomicAdd(&ret[Y], db[Y]);
+        atomicAdd(&ret[Z], db[Z]);
+    }
+}
+
+    """
+        GPU_ACCELERETE.CUDA_MAGNETIC_FIELD_AT_CCT = SourceModule(
+            CUDA_GENERAL_CODE + CUDA_MAGNET_SOLO_CCT
+        ).get_function("magnet_solo_cct")
+
+    @staticmethod
+    def magnetic_field_at(magnet: Magnet, point: P3) -> P3:
+        """
+        magnet 在 point 处产生的磁场
+        这个方法需要反复传输数据，速度比 CPU 慢
+        """
+        GPU_ACCELERETE.__compile()
+        if isinstance(magnet, CCT):
+            # point 转为局部坐标，并变成 numpy 向量
+            p = magnet.local_coordinate_system.point_to_local_coordinate(
+                point
+            ).to_numpy_ndarry3_float32()
+            length = int(magnet.dispersed_path3.shape[0])
+            winding = magnet.dispersed_path3.flatten().astype(numpy.float32)
+            ret = numpy.zeros((3,), dtype=numpy.float32)
+            GPU_ACCELERETE.CUDA_MAGNETIC_FIELD_AT_CCT(
+                drv.In(winding),
+                drv.In(p),
+                drv.In(numpy.array([length]).astype(numpy.int32)),
+                drv.Out(ret),
+                block=(512, 1, 1),
+                grid=(256, 1),
+            )
+            print(p)
+            return P3.from_numpy_ndarry3(ret * magnet.current * 1e-7)
+
+
+if __name__ == "__main__":
+    cct = CCT(
+        LocalCoordinateSystem.global_coordinate_system(),
+        0.95,
+        83 * MM + 15 * MM * 2,
+        67.5,
+        [30.0, 80.0, 90.0, 90.0],
+        128,
+        -9664,
+        P2(0, 0),
+        P2(128 * math.pi * 2, 67.5 / 180.0 * math.pi),
+    )
+
+    Plot3.plot_cct(cct)
+    Plot3.show()
