@@ -2,17 +2,21 @@
 CCT 建模优化全套解决方案
 文档见 introduction2cctpy.ipynb
 """
-from typing import Callable, List
-from unittest.main import main
+from typing import Callable, Generic, List, TypeVar
 import matplotlib.pyplot as plt
 import math
 import sys
 import numpy
 
-# 如果没有安装 CUDA 和 pycuda / 不需要 GPU 加速，可以删除下面三行
-import pycuda.autoinit
-import pycuda.driver as drv
-from pycuda.compiler import SourceModule
+GPU_ON: bool = True
+
+try:
+    import pycuda.autoinit
+    import pycuda.driver as drv
+    from pycuda.compiler import SourceModule
+except ModuleNotFoundError as me:
+    GPU_ON = False
+    print("注意：没有安装 PYCUDA，无法使用 GPU 加速")
 
 # 常量
 M: float = 1.0  # 一米
@@ -24,6 +28,7 @@ J: float = 1.0  # 焦耳
 eV = 1.6021766208e-19 * J  # 电子伏特转焦耳
 MeV = 1000 * 1000 * eV  # 兆电子伏特
 MeV_PER_C = 5.3442857792e-22  # kg m/s 动量单位
+T = TypeVar("T")  # 泛型，把 python 不当作脚本时建议使用
 
 
 class BaseUtils:
@@ -47,7 +52,11 @@ class BaseUtils:
         if (isinstance(a, float) or isinstance(a, int)) and (
             isinstance(b, float) or isinstance(b, int)
         ):
-            if a == b or abs(a - b) <= err or 2 * abs((a - b) / (a + b)) <= err:
+            if (
+                a == b
+                or abs(a - b) <= err
+                or ((a + b != 0.0) and ((2 * abs((a - b) / (a + b))) <= err))
+            ):
                 return True
             else:
                 if msg is None:
@@ -100,6 +109,46 @@ class BaseUtils:
             return [BaseUtils.radian_to_angle(d) for d in rad]
         else:
             raise NotImplementedError
+
+    @staticmethod
+    def circle_center_and_radius(p1, p2, p3):
+        """
+        已知三个二维点 p1 p2 p3
+        求由这三个点组成的圆的圆心和半径
+        方法来自：https://blog.csdn.net/liutaojia/article/details/83625151
+        """
+        x1 = p1.x
+        x2 = p2.x
+        x3 = p3.x
+        y1 = p1.y
+        y2 = p2.y
+        y3 = p3.y
+        z1 = x2 ** 2 + y2 ** 2 - x1 ** 2 - y1 ** 2
+        z2 = x3 ** 2 + y3 ** 2 - x1 ** 2 - y1 ** 2
+        z3 = x3 ** 2 + y3 ** 2 - x2 ** 2 - y2 ** 2
+        A = numpy.array(
+            [[(x2 - x1), (y2 - y1)], [(x3 - x1), (y3 - y1)], [(x3 - x2), (y3 - y2)]]
+        )
+        B = 0.5 * numpy.array([[z1], [z2], [z3]])
+        c = numpy.linalg.inv(A.T @ A) @ A.T @ B
+        c = P2.from_numpy_ndarry(c)
+        # c = (A'*A)\A'*B;
+        R1 = math.sqrt((c.x - x1) ** 2 + (c.y - y1) ** 2)
+        R2 = math.sqrt((c.x - x2) ** 2 + (c.y - y2) ** 2)
+        R3 = math.sqrt((c.x - x3) ** 2 + (c.y - y3) ** 2)
+        R = (R1 + R2 + R3) / 3
+        return (c, R)
+
+    @staticmethod
+    def polynomial_fitting(xs: List[float], ys: List[float], order: int) -> List[float]:
+        """
+        多项式拟合
+        xs 自变量，ys 变量，拟合阶数为 order，返回一个数组
+        数组第 0 项为拟合常数项
+        数组第 i 项为拟合 i 次项
+        """
+        fit = numpy.polyfit(xs, ys, order)
+        return fit[::-1].tolist()
 
     @staticmethod
     def print_traceback():
@@ -388,6 +437,15 @@ class P2:
     def to_list(self) -> List[float]:
         return [self.x, self.y]
 
+    @staticmethod
+    def from_numpy_ndarry(ndarray: numpy.ndarray):
+        if ndarray.shape == (2,) or ndarray.shape == (2, 1):
+            return P2(ndarray[0], ndarray[1])
+        elif len(ndarray.shape) == 2 and ndarray.shape[1] == 2:
+            return [P2.from_numpy_ndarry(sub_array) for sub_array in ndarray]
+        else:
+            raise ValueError(f"无法将{ndarray}转为P2或List[P2]")
+
 
 class P3:
     """
@@ -528,14 +586,32 @@ class P3:
         return [self.x, self.y, self.z]
 
     @staticmethod
-    def from_numpy_ndarry3(array3: numpy.ndarray):
-        return P3(array3[0], array3[1], array3[2])
+    def from_numpy_ndarry(ndarray: numpy.ndarray):
+        if ndarray.shape == (3,) or ndarray.shape == (3, 1):
+            return P3(ndarray[0], ndarray[1], ndarray[2])
+        elif len(ndarray.shape) == 2 and ndarray.shape[1] == 3:
+            return [P3.from_numpy_ndarry(sub_array) for sub_array in ndarray]
+        else:
+            raise ValueError(f"无法将{ndarray}转为P3或List[P3]")
 
     def to_numpy_ndarry3(self) -> numpy.ndarray:
         return numpy.array(self.to_list())
 
     def to_numpy_ndarry3_float32(self) -> numpy.ndarray:
         return numpy.array(self.to_list(), dtype=numpy.float32)
+
+    def to_p2(p, transformation: Callable = lambda p3: P2(p3.x, p3.y)) -> P2:
+        return transformation(p)
+
+
+class ValueWithDistance(Generic[T]):
+    """
+    辅助对象，带有距离的一个量，通常用于描述线上磁场分布
+    """
+
+    def __init__(self, value: T, distance: float) -> None:
+        self.value: T = value
+        self.distance: float = distance
 
 
 class Magnet:
@@ -558,7 +634,9 @@ class Magnet:
         """
         raise NotImplementedError
 
-    def magnetic_field_along(self, line, step: float = 1 * MM) -> List[P3]:
+    def magnetic_field_along(
+        self, line2, step: float = 1 * MM
+    ) -> List[ValueWithDistance[P3]]:
         """
         计算本对象在三维曲线 line 上的磁场分布
         ----------
@@ -567,18 +645,66 @@ class Magnet:
         Returns 本对象在三维曲线 line 上的磁场分布，用三维矢量的数组表示
         -------
         """
-        if isinstance(line, List):
-            return [self.magnetic_field_at(p) for p in line]
-        elif isinstance(line, Line2):
-            return self.magnetic_field_along(line.disperse3d(step))
-        else:
-            raise NotImplementedError
+        length = line2.get_length()
+        distances = BaseUtils.linspace(0, length, int(length / step))
+        return [
+            ValueWithDistance(self.magnetic_field_at(line2.point_at(d).to_p3()), d)
+            for d in distances
+        ]
+
+    def magnetic_field_bz_along(self, line, step: float = 1 * MM) -> List[P2]:
+        ms: List[ValueWithDistance[P3]] = self.magnetic_field_along(line, step)
+        return [P2(p3d.distance, p3d.value.z) for p3d in ms]
+
+    def graident_field_along(
+        self,
+        line,
+        good_field_area_width: float = 10 * MM,
+        step: float = 1 * MM,
+        point_number: int = 4,
+    ) -> List[P2]:
+        raise NotImplementedError
+
+    def second_graident_field_along(
+        self,
+        line,
+        good_field_area_width: float = 10 * MM,
+        step: float = 1 * MM,
+        point_number: int = 4,
+    ) -> List[P2]:
+        raise NotImplementedError
+
+    def multipole_field_along(
+        self,
+        line,
+        order: int,
+        good_field_area_width: float = 10 * MM,
+        step: float = 1 * MM,
+        point_number: int = 4,
+    ) -> List[List[P2]]:
+        raise NotImplementedError
+
+    def integration_field(self, line, step: float = 1 * MM) -> float:
+        raise NotADirectoryError
+
+    def slice_to_cosy_script(
+        self,
+        Bp: float,
+        aperture_radius: float,
+        line,
+        good_field_area_width: float,
+        min_step_length: float,
+        tolerance: float,
+    ) -> None:
+        raise NotImplementedError
 
 
-class BeamlineObject:
+class ApertureObject:
     """
-    表示束线上的一个对象，可以判断点 point 是在这个对象的孔径内还是孔径外
+    表示具有孔径的一个对象
+    可以判断点 point 是在这个对象的孔径内还是孔径外
     """
+
     def is_out_of_aperture(point: P3) -> bool:
         """
         判断点 point 是在这个对象的孔径内还是孔径外
@@ -654,8 +780,44 @@ class LocalCoordinateSystem:
             + self.ZI * local_coordinate_point.z
         )
 
+    def vector_to_local_coordinate(self, global_coordinate_vector: P3) -> P3:
+        """
+        全局坐标系 -> 局部坐标系
+        Parameters
+        ----------
+        global_coordinate_point 全局坐标系中的矢量
+
+        Returns 局部坐标系中的矢量坐标
+        -------
+        """
+        x = self.XI * global_coordinate_vector
+        y = self.YI * global_coordinate_vector
+        z = self.ZI * global_coordinate_vector
+        return P3(x, y, z)
+
+    def vector_to_global_coordinate(self, local_coordinate_vector: P3) -> P3:
+        """
+        局部坐标系 -> 全局坐标系
+        Parameters
+        ----------
+        local_coordinate_point 局部坐标中的矢量
+
+        Returns 全局坐标系中的矢量
+        -------
+
+        """
+
+        return (
+            self.XI * local_coordinate_vector.x
+            + self.YI * local_coordinate_vector.y
+            + self.ZI * local_coordinate_vector.z
+        )
+
     def __str__(self) -> str:
         return f"ORIGIN={self.location}, xi={self.XI}, yi={self.YI}, zi={self.ZI}"
+
+    def __repr__(self) -> str:
+        return self.__str__()
 
     @staticmethod
     def create_by_y_and_z_direction(location: P3, y_direction: P3, z_direction: P3):
@@ -678,7 +840,9 @@ class LocalCoordinateSystem:
         )
 
         x_direction = y_direction @ z_direction
-        return LocalCoordinateSystem(location, z_direction, x_direction)
+        return LocalCoordinateSystem(
+            location=location, x_direction=x_direction, z_direction=z_direction
+        )
 
     @staticmethod
     def global_coordinate_system():
@@ -865,7 +1029,7 @@ class StraightLine2(Line2):
     """
 
     def __init__(self, length: float, direct: P2, start_point: P2):
-        self.length = length
+        self.length = float(length)
         self.direct = direct
         self.start_point = start_point
 
@@ -880,6 +1044,44 @@ class StraightLine2(Line2):
 
     def __str__(self):
         return f"直线段，起点{self.start_point}，方向{self.direct}，长度{self.length}"
+
+    def position_of(self, p: P2) -> int:
+        """
+        求点 p 相对于直线段的方位
+        返回值：
+            1  在右侧
+            -1 在左侧
+            0  在直线段所在直线上
+        因为直线段 self 是有方向的，所以可以确定左侧还是右侧
+        这个函数用于确定 trajectory 当前是左偏还是右偏 / 逆时针偏转还是顺时针偏转
+            #
+        --------------&---->
+                $
+        如上图，对于点 # ，在直线左侧，返回 -1
+        对于点 & 在直线上，返回 0
+        对于点 $，在直线右侧，返回 1
+        """
+        p0 = self.start_point  # 直线段起点
+        d = self.direct  # 直线方向
+
+        p0_t0_p: P2 = p - p0  # 点 p0 到 p
+        k: float = d * p0_t0_p  # 投影
+        project: P2 = k * d  # 投影点
+
+        vertical_line: P2 = p0_t0_p - project  # 点 p 的垂线方向
+
+        # 垂线长度 0，说明点 p 在直线上
+        if vertical_line == P2.zeros():
+            return 0
+
+        # 归一化
+        vertical_line = vertical_line.normalize()
+        right_hand: P2 = d.rotate(BaseUtils.angle_to_radian(-90)).normalize()  # 右手侧
+
+        if vertical_line == right_hand:
+            return 1
+        else:
+            return -1
 
 
 class ArcLine2(Line2):
@@ -985,7 +1187,7 @@ class ArcLine2(Line2):
 
 class Trajectory(Line2):
     """
-    二维轨迹，由直线+圆弧组成
+    二维设计轨迹，由直线+圆弧组成
     """
 
     def __init__(self, first_line2: Line2):
@@ -1099,6 +1301,17 @@ class Trajectory(Line2):
     def __str__(self):
         details = "\t\n".join(self.__trajectoryList.__str__())
         return f"Trajectory:{details}"
+
+    @staticmethod
+    def set_start_point(start_point: P2):
+        class TrajectoryBuilder:
+            def __init__(self, start_point: P2):
+                self.start_point = start_point
+
+            def first_line2(self, direct: P2, length: float):
+                return Trajectory(StraightLine2(length, direct, self.start_point))
+
+        return TrajectoryBuilder(start_point)
 
 
 class Protons:
@@ -2004,7 +2217,7 @@ class ParticleFactory:
         ]
 
 
-class CCT(Magnet,BeamlineObject):
+class CCT(Magnet, ApertureObject):
     """
     表示一层弯曲 CCT 线圈
     """
@@ -2044,23 +2257,23 @@ class CCT(Magnet,BeamlineObject):
         self.disperse_number_per_winding = int(disperse_number_per_winding)
 
         # 弯转角度，弧度制
-        self.bending_radian = BaseUtils.angle_to_radian(bending_angle)
+        self.bending_radian = BaseUtils.angle_to_radian(self.bending_angle)
 
         # 倾斜角，弧度制
-        self.tilt_radians = BaseUtils.angle_to_radian(tilt_angles)
+        self.tilt_radians = BaseUtils.angle_to_radian(self.tilt_angles)
 
         # 每绕制一匝，φ 方向前进长度
-        self.phi0 = self.bending_radian / winding_number
+        self.phi0 = self.bending_radian / self.winding_number
 
         # 极点 a
-        self.a = math.sqrt(big_r ** 2 - small_r ** 2)
+        self.a = math.sqrt(self.big_r ** 2 - self.small_r ** 2)
 
         # 双极坐标系另一个常量 η
-        self.eta = 0.5 * math.log((big_r + self.a) / (big_r - self.a))
+        self.eta = 0.5 * math.log((self.big_r + self.a) / (self.big_r - self.a))
 
         # 建立 ξ-φ 坐标到三维 xyz 坐标的转换器
         self.bipolar_toroidal_coordinate_system = CCT.BipolarToroidalCoordinateSystem(
-            self.a, self.eta, big_r, small_r
+            self.a, self.eta, self.big_r, self.small_r
         )
 
         # CCT 路径的在 ξ-φ 坐标的表示 函数 φ(ξ)
@@ -2188,7 +2401,13 @@ class CCT(Magnet,BeamlineObject):
         # 求和，即得到磁场，记得乘以系数 μ0/4π = 1e-7
         B = numpy.sum(dB, axis=0) * 1e-7
 
-        return P3.from_numpy_ndarry3(B)
+        # 转回 P3
+        B: P3 = P3.from_numpy_ndarry(B)
+
+        # 从局部坐标转回全局坐标
+        B: P3 = self.local_coordinate_system.vector_to_global_coordinate(B)
+
+        return B
 
     def __str__(self):
         return (
@@ -2198,8 +2417,80 @@ class CCT(Magnet,BeamlineObject):
             + f"disperse_number_per_winding({self.disperse_number_per_winding})"
         )
 
+    @staticmethod
+    def create_cct_along(
+        # 设计轨道
+        trajectory: Line2,
+        # 设计轨道上该 CCT 起点
+        s: float,
+        # 大半径：偏转半径
+        big_r: float,
+        # 小半径（孔径/2）
+        small_r: float,
+        # 偏转角度，即 phi0*winding_number，典型值 67.5
+        bending_angle: float,
+        # 各极倾斜角，典型值 [30,90,90,90]
+        tilt_angles: List[float],
+        # 匝数
+        winding_number: int,
+        # 电流
+        current: float,
+        # CCT 路径在二维 ξ-φ 坐标系中的起点
+        starting_point_in_ksi_phi_coordinate: P2,
+        # CCT 路径在二维 ξ-φ 坐标系中的终点
+        end_point_in_ksi_phi_coordinate: P2,
+        # 每匝线圈离散电流元数目，数字越大计算精度越高
+        disperse_number_per_winding: int = 120,
+    ):
+        """
+        按照设计轨迹 trajectory 上 s 位置处创建 CCT
+        """
+        start_point: P2 = trajectory.point_at(s)
+        arc_length: float = big_r * BaseUtils.angle_to_radian(bending_angle)
+        end_point: P2 = trajectory.point_at(s)
 
-class QS(Magnet,BeamlineObject):
+        midpoint0: P2 = trajectory.point_at(s + arc_length / 3 * 1)
+        midpoint1: P2 = trajectory.point_at(s + arc_length / 3 * 2)
+
+        c1, r1 = BaseUtils.circle_center_and_radius(start_point, midpoint0, midpoint1)
+        c2, r2 = BaseUtils.circle_center_and_radius(midpoint0, midpoint1, end_point)
+        BaseUtils.equal(c1, c2, msg=f"构建 CCT 存在异常，通过设计轨道判断 CCT 圆心不一致，c1{c1}，c2{c2}")
+        BaseUtils.equal(r1, r2, msg=f"构建 CCT 存在异常，通过设计轨道判断 CCT 半径不一致，r1{r1}，r2{r2}")
+        center: P2 = (c1 + c2) * 0.5
+
+        start_direct: P2 = trajectory.direct_at(s)
+        pos: int = StraightLine2(1, start_direct, start_point).position_of(center)
+
+        lcs: LocalCoordinateSystem = None
+        if pos == 0:
+            raise ValueError(f"错误：圆心{center}在设计轨道{trajectory}上")
+        elif pos == 1:
+            lcs = LocalCoordinateSystem.create_by_y_and_z_direction(
+                location=center.to_p3(),
+                y_direction=-start_direct.to_p3(),  # diff
+                z_direction=P3.z_direct(),
+            )
+        else:
+            lcs = LocalCoordinateSystem.create_by_y_and_z_direction(
+                location=center.to_p3(),
+                y_direction=start_direct.to_p3(),  # diff
+                z_direction=P3.z_direct(),
+            )
+        return CCT(
+            local_coordinate_system=lcs,
+            big_r=big_r,
+            small_r=small_r,
+            bending_angle=bending_angle,
+            tilt_angles=tilt_angles,
+            winding_number=winding_number,
+            current=current,
+            starting_point_in_ksi_phi_coordinate=starting_point_in_ksi_phi_coordinate,
+            end_point_in_ksi_phi_coordinate=end_point_in_ksi_phi_coordinate,
+            disperse_number_per_winding=disperse_number_per_winding,
+        )
+
+
+class QS(Magnet, ApertureObject):
     """
     硬边 QS 磁铁，由以下参数完全确定：
 
@@ -2270,6 +2561,51 @@ class QS(Magnet,BeamlineObject):
                     + self.local_coordinate_system.YI * by
                 )
 
+    @staticmethod
+    def create_qs_along(
+        trajectory: Line2,
+        s: float,
+        length: float,
+        gradient: float,
+        second_gradient: float,
+        aperture_radius: float,
+    ):
+        """
+        按照设计轨迹 trajectory 的 s 处创建 QS 磁铁
+        """
+        origin: P2 = trajectory.point_at(s)
+        z_direct: P2 = trajectory.direct_at(s)
+        x_direct: P2 = z_direct.rotate(BaseUtils.angle_to_radian(90))
+
+        lcs: LocalCoordinateSystem = LocalCoordinateSystem(
+            location=origin.to_p3(),
+            x_direction=x_direct.to_p3(),
+            z_direction=z_direct.to_p3(),
+        )
+
+        return QS(
+            local_coordinate_system=lcs,
+            length=length,
+            gradient=gradient,
+            second_gradient=second_gradient,
+            aperture_radius=aperture_radius,
+        )
+
+
+class Beamline(Magnet):
+    def __init__(self) -> None:
+        self.magnets: List[Magnet] = list[Magnet]()
+
+    def magnetic_field_at(self, point: P3) -> P3:
+        b: P3 = P3.zeros()
+        for m in self.magnets:
+            b += m.magnetic_field_at(point)
+        return b
+
+    def add(self, m: Magnet):
+        self.magnets.append(m)
+        return self
+
 
 class Plot3:
     INIT: bool = False
@@ -2307,8 +2643,21 @@ class Plot3:
         Plot3.ax.plot([p.x for p in ps], [p.y for p in ps], [p.z for p in ps], describe)
 
     @staticmethod
-    def plot3d(line: Line2, step: float = 1 * MM, describe="r"):
-        Plot3.plot_p3s(line.disperse3d(step), describe)
+    def plot_line2(line2: Line2, step: float = 1 * MM, describe="r"):
+        Plot3.plot_p3s(line2.disperse3d(step), describe)
+
+    @staticmethod
+    def plot_beamline(beamline: Beamline, describes=["r-"]) -> None:
+        size = len(beamline.magnets)
+        for i in range(size):
+            b = beamline.magnets[i]
+            d = describes[i] if i < len(describes) else describes[-1]
+            if isinstance(b, QS):
+                Plot3.plot_qs(b, d)
+            elif isinstance(b, CCT):
+                Plot3.plot_cct(b, d)
+            else:
+                print(f"无法绘制{b}")
 
     @staticmethod
     def plot_ndarry3ds(narray: numpy.ndarray, describe="r-") -> None:
@@ -2323,8 +2672,13 @@ class Plot3:
     def plot_cct(cct: CCT, describe="r-") -> None:
         if not Plot3.INIT:
             Plot3.__init()
-        cct_path3: numpy.ndarray = cct.dispersed_path3
-        Plot3.plot_ndarry3ds(cct_path3)
+        cct_path3d: numpy.ndarray = cct.dispersed_path3
+        cct_path3d_points: List[P3] = P3.from_numpy_ndarry(cct_path3d)
+        cct_path3d_points: List[P3] = [
+            cct.local_coordinate_system.point_to_global_coordinate(p)
+            for p in cct_path3d_points
+        ]
+        Plot3.plot_p3s(cct_path3d_points, describe)
 
     @staticmethod
     def plot_qs(qs: QS, describe="r-") -> None:
@@ -2365,6 +2719,12 @@ class Plot3:
         Plot3.plot_p3s(axial_direction_line_1, describe)
         Plot3.plot_p3s(axial_direction_line_2, describe)
         Plot3.plot_p3s(axial_direction_line_3, describe)
+
+    @staticmethod
+    def set_center(center: P3, cube_size: float) -> None:
+        p = P3(cube_size, cube_size, cube_size)
+        Plot3.plot_p3(center - p, "w")
+        Plot3.plot_p3(center + p, "w")
 
     @staticmethod
     def show():
@@ -2414,11 +2774,62 @@ class Plot2:
         plt.plot(x, y, describe)
 
     @staticmethod
-    def plot_cct(cct: CCT, describe="r-") -> None:
+    def plot_cct_path2d(cct: CCT, describe="r-") -> None:
         if not Plot2.INIT:
             Plot2.__init()
         cct_path2: numpy.ndarray = cct.dispersed_path2
-        Plot2.plot_ndarry2ds(cct_path2)
+        Plot2.plot_ndarry2ds(cct_path2, describe)
+
+    @staticmethod
+    def plot_cct_path3d_in_2d(cct: CCT, describe="r-") -> None:
+        if not Plot2.INIT:
+            Plot2.__init()
+        cct_path3d: numpy.ndarray = cct.dispersed_path3
+        cct_path3d_points: List[P3] = P3.from_numpy_ndarry(cct_path3d)
+        cct_path3d_points: List[P3] = [
+            cct.local_coordinate_system.point_to_global_coordinate(p)
+            for p in cct_path3d_points
+        ]
+        cct_path2d_points: List[P2] = [p.to_p2() for p in cct_path3d_points]
+        Plot2.plot_p2s(cct_path2d_points, describe)
+
+    def plot_qs(qs: QS, describe="r-") -> None:
+        length = qs.length
+        aper = qs.aperture_radius
+        lsc = qs.local_coordinate_system
+        origin = lsc.location
+
+        outline = [
+            origin,
+            origin + lsc.XI * aper,
+            origin + lsc.XI * aper + lsc.ZI * length,
+            origin - lsc.XI * aper + lsc.ZI * length,
+            origin - lsc.XI * aper,
+            origin,
+        ]
+
+        outline_2d = [p.to_p2() for p in outline]
+        Plot2.plot_p2s(outline_2d, describe)
+
+    @staticmethod
+    def plot_beamline(beamline: Beamline, describes=["r-"]) -> None:
+        size = len(beamline.magnets)
+        for i in range(size):
+            b = beamline.magnets[i]
+            d = describes[i] if i < len(describes) else describes[-1]
+            if isinstance(b, QS):
+                Plot2.plot_qs(b, d)
+            elif isinstance(b, CCT):
+                Plot2.plot_cct_path3d_in_2d(b, d)
+            else:
+                print(f"无法绘制{b}")
+
+    @staticmethod
+    def plot_line2(line: Line2, step: float = 1 * MM, describe="r-") -> None:
+        if not Plot2.INIT:
+            Plot2.__init()
+        p2s = line.disperse2d(step)
+        Plot2.plot_p2s(p2s, describe)
 
     @staticmethod
     def equal():
@@ -2595,21 +3006,190 @@ __global__ void magnet_solo_cct(float *winding, float *p, int *length, float *re
                 grid=(256, 1),
             )
             print(p)
-            return P3.from_numpy_ndarry3(ret * magnet.current * 1e-7)
+            return P3.from_numpy_ndarry(ret * magnet.current * 1e-7)
 
 
 if __name__ == "__main__":
-    cct = CCT(
-        LocalCoordinateSystem.global_coordinate_system(),
-        0.95,
-        83 * MM + 15 * MM * 2,
-        67.5,
-        [30.0, 80.0, 90.0, 90.0],
-        128,
-        -9664,
-        P2(0, 0),
-        P2(128 * math.pi * 2, 67.5 / 180.0 * math.pi),
+    DL2 = 2.1162209
+    GAP3 = 0.1978111
+    QS3_LEN = 0.2382791
+    QS3_GRADIENT = -7.3733
+    QS3_SECOND_GRADIENT = -45.31 * 2.0
+    QS3_APERTURE = 60 * MM
+    big_r_part2 = 0.95
+    CCT_APERTURE = 80 * MM
+
+    small_r_gap = 15 * MM
+    small_r_innerest = 83 * MM
+    agcct_small_r_in = small_r_innerest
+    agcct_small_r_out = small_r_innerest + small_r_gap
+    dipole_cct_small_r_in = small_r_innerest + small_r_gap * 2
+    dipole_cct_small_r_out = small_r_innerest + small_r_gap * 3
+
+    dipole_cct_winding_num: int = 128
+    agcct_winding_nums: List[int] = [21, 50, 50]
+
+    dipole_cct_bending_angle = 67.5
+    dipole_cct_bending_rad = BaseUtils.angle_to_radian(dipole_cct_bending_angle)
+    agcct_bending_angles: List[float] = [8 + 3.716404, 8 + 19.93897, 8 + 19.844626]
+    agcct_bending_angles_rad: List[float] = BaseUtils.angle_to_radian(
+        agcct_bending_angles
     )
 
-    Plot3.plot_cct(cct)
+    dipole_cct_tilt_angles = numpy.array([30.0, 80.0, 90.0, 90.0])
+    agcct_tilt_angles = numpy.array([90.0, 30.0, 90.0, 90.0])
+
+    dipole_cct_current = 9664.0
+    agcct_current = -6000.0
+
+    disperse_number_per_winding: int = 120
+
+    trajectory_part2 = (
+        Trajectory.set_start_point(P2(3.703795764767297, 1.5341624380266456))
+        .first_line2(P2(1, 1), DL2)
+        .add_arc_line(0.95, True, dipole_cct_bending_angle)
+    )
+
+    beamline = Beamline()
+    # beamline.add(
+    #     CCT.create_cct_along(
+    #         trajectory=trajectory_part2,
+    #         s=DL2,
+    #         big_r=big_r_part2,
+    #         small_r=dipole_cct_small_r_in,
+    #         bending_angle=dipole_cct_bending_angle,
+    #         tilt_angles=dipole_cct_tilt_angles,
+    #         winding_number=dipole_cct_winding_num,
+    #         current=dipole_cct_current,
+    #         starting_point_in_ksi_phi_coordinate=P2.origin(),
+    #         end_point_in_ksi_phi_coordinate=P2(
+    #             2 * math.pi * dipole_cct_winding_num, -dipole_cct_bending_rad
+    #         ),
+    #         disperse_number_per_winding=disperse_number_per_winding,
+    #     )
+    # )
+
+    # beamline.add(
+    #     CCT.create_cct_along(
+    #         trajectory=trajectory_part2,
+    #         s=DL2,
+    #         big_r=big_r_part2,
+    #         small_r=dipole_cct_small_r_out,  # diff
+    #         bending_angle=dipole_cct_bending_angle,
+    #         tilt_angles=-dipole_cct_tilt_angles,  # diff ⭐
+    #         winding_number=dipole_cct_winding_num,
+    #         current=dipole_cct_current,
+    #         starting_point_in_ksi_phi_coordinate=P2.origin(),
+    #         end_point_in_ksi_phi_coordinate=P2(
+    #             -2 * math.pi * dipole_cct_winding_num, -dipole_cct_bending_rad
+    #         ),
+    #         disperse_number_per_winding=disperse_number_per_winding,
+    #     )
+    # )
+
+    agcct_index = 0
+    agcct_start_in = P2.origin()
+    agcct_start_out = P2.origin()
+    agcct_end_in = P2(
+        ((-1.0) ** agcct_index) * 2 * math.pi * agcct_winding_nums[agcct_index],
+        -agcct_bending_angles_rad[agcct_index],
+    )
+    agcct_end_out = P2(
+        ((-1.0) ** (agcct_index + 1)) * 2 * math.pi * agcct_winding_nums[agcct_index],
+        -agcct_bending_angles_rad[agcct_index],
+    )
+    # beamline.add(
+    #     CCT.create_cct_along(
+    #         trajectory=trajectory_part2,
+    #         s=DL2,
+    #         big_r=big_r_part2,
+    #         small_r=agcct_small_r_in,
+    #         bending_angle=agcct_bending_angles[agcct_index],
+    #         tilt_angles=agcct_tilt_angles,
+    #         winding_number=agcct_winding_nums[agcct_index],
+    #         current=agcct_current,
+    #         starting_point_in_ksi_phi_coordinate=agcct_start_in,
+    #         end_point_in_ksi_phi_coordinate=agcct_end_in,
+    #         disperse_number_per_winding=disperse_number_per_winding,
+    #     )
+    # )
+
+    beamline.add(
+        CCT.create_cct_along(
+            trajectory=trajectory_part2,
+            s=DL2,
+            big_r=big_r_part2,
+            small_r=agcct_small_r_out,
+            bending_angle=agcct_bending_angles[agcct_index],
+            tilt_angles=-agcct_tilt_angles,
+            winding_number=agcct_winding_nums[agcct_index],
+            current=agcct_current,
+            starting_point_in_ksi_phi_coordinate=agcct_start_out,
+            end_point_in_ksi_phi_coordinate=agcct_end_out,
+            disperse_number_per_winding=disperse_number_per_winding,
+        )
+    )
+
+    for ignore in range(len(agcct_bending_angles) - 1):
+        agcct_index += 1
+        agcct_start_in = agcct_end_in + P2(
+            0,
+            -agcct_bending_angles_rad[agcct_index - 1]
+            / agcct_winding_nums[agcct_index - 1],
+        )
+        agcct_start_out = agcct_end_out + P2(
+            0,
+            -agcct_bending_angles_rad[agcct_index - 1]
+            / agcct_winding_nums[agcct_index - 1],
+        )
+        agcct_end_in = agcct_start_in + P2(
+            ((-1) ** agcct_index) * 2 * math.pi * agcct_winding_nums[agcct_index],
+            -agcct_bending_angles_rad[agcct_index],
+        )
+        agcct_end_out = agcct_start_out + P2(
+            ((-1) ** (agcct_index + 1)) * 2 * math.pi * agcct_winding_nums[agcct_index],
+            -agcct_bending_angles_rad[agcct_index],
+        )
+        # beamline.add(
+        #     CCT.create_cct_along(
+        #         trajectory=trajectory_part2,
+        #         s=DL2,
+        #         big_r=big_r_part2,
+        #         small_r=agcct_small_r_in,
+        #         bending_angle=agcct_bending_angles[agcct_index],
+        #         tilt_angles=agcct_tilt_angles,
+        #         winding_number=agcct_winding_nums[agcct_index],
+        #         current=agcct_current,
+        #         starting_point_in_ksi_phi_coordinate=agcct_start_in,
+        #         end_point_in_ksi_phi_coordinate=agcct_end_in,
+        #         disperse_number_per_winding=disperse_number_per_winding,
+        #     )
+        # )
+
+        beamline.add(
+            CCT.create_cct_along(
+                trajectory=trajectory_part2,
+                s=DL2,
+                big_r=big_r_part2,
+                small_r=agcct_small_r_out,
+                bending_angle=agcct_bending_angles[agcct_index],
+                tilt_angles=-agcct_tilt_angles,
+                winding_number=agcct_winding_nums[agcct_index],
+                current=agcct_current,
+                starting_point_in_ksi_phi_coordinate=agcct_start_out,
+                end_point_in_ksi_phi_coordinate=agcct_end_out,
+                disperse_number_per_winding=disperse_number_per_winding,
+            )
+        )
+
+    Plot3.plot_line2(trajectory_part2)
+    Plot3.plot_beamline(beamline, ["r-", "g-", "y-", "b-"])
+
+    # Plot2.plot_p2s(beamline.magnetic_field_bz_along(trajectory_part2))
+
+    # print(beamline.magnetic_field_at(trajectory_part2.point_at(DL2).to_p3()))
+    # print(beamline.magnetic_field_at(trajectory_part2.point_at(DL2).to_p3()))
+
+    # Plot2.equal()
+    Plot3.set_center(trajectory_part2.point_at(DL2).to_p3(), 5)
     Plot3.show()
