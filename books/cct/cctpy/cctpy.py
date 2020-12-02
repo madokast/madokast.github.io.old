@@ -632,12 +632,12 @@ class LocalCoordinateSystem:
         )
 
         # 局部坐标系，原心
-        self.location = location.copy()
+        self.location: P3 = location.copy()
 
         # 局部坐标系的 x y z 三方向
-        self.ZI = z_direction.copy().normalize()
-        self.XI = x_direction.copy().normalize()
-        self.YI = self.ZI @ self.XI
+        self.ZI: P3 = z_direction.copy().normalize()
+        self.XI: P3 = x_direction.copy().normalize()
+        self.YI: P3 = self.ZI @ self.XI
 
     def point_to_local_coordinate(self, global_coordinate_point: P3) -> P3:
         """
@@ -938,7 +938,7 @@ class Line2:
         -------
 
         """
-        return [p.to_p3(p2_t0_p3) for p in self.disperse2d(step)]
+        return [p.to_p3(p2_t0_p3) for p in self.disperse2d(step=step)]
 
     def disperse3d_with_distance(
         self,
@@ -951,7 +951,7 @@ class Line2:
         """
         return [
             ValueWithDistance(P3)(vp2.value.to_p3(p2_t0_p3), vp2.distance)
-            for vp2 in self.disperse2d_with_distance(step)
+            for vp2 in self.disperse2d_with_distance(step=step)
         ]
 
     def __str__(self):
@@ -2933,29 +2933,44 @@ class Plot3:
             qs.local_coordinate_system.point_to_global_coordinate(p)
             for p in back_circle_local
         ]
-        # 画四条轴线
-        axial_direction_line_0 = [front_circle[0], back_circle[0]]
-        axial_direction_line_1 = [front_circle[90], back_circle[90]]
-        axial_direction_line_2 = [front_circle[180], back_circle[180]]
-        axial_direction_line_3 = [front_circle[270], back_circle[270]]
+        
         Plot3.plot_p3s(front_circle, describe)
         Plot3.plot_p3s(mid_circle, describe)
         Plot3.plot_p3s(back_circle, describe)
-        Plot3.plot_p3s(axial_direction_line_0, describe)
-        Plot3.plot_p3s(axial_direction_line_1, describe)
-        Plot3.plot_p3s(axial_direction_line_2, describe)
-        Plot3.plot_p3s(axial_direction_line_3, describe)
+
+        # 画轴线
+        for i in range(0,360,10):
+            Plot3.plot_p3s([front_circle[i], back_circle[i]],describe)
+
+    @staticmethod
+    def plot_local_coordinate_system(
+        local_coordinate_syste: LocalCoordinateSystem,
+        axis_lengths: List[float] = [100 * MM] * 3,
+        describe="r-",
+    ) -> None:
+        origin = local_coordinate_syste.location
+        xi = local_coordinate_syste.XI
+        yi = local_coordinate_syste.YI
+        zi = local_coordinate_syste.ZI
+
+        Plot3.plot_p3s(ps=[origin, origin + xi * axis_lengths[0]], describe=describe)
+        Plot3.plot_p3s(ps=[origin, origin + yi * axis_lengths[1]], describe=describe)
+        Plot3.plot_p3s(ps=[origin, origin + zi * axis_lengths[2]], describe=describe)
 
     @staticmethod
     def set_center(center: P3, cube_size: float) -> None:
         p = P3(cube_size, cube_size, cube_size)
         Plot3.plot_p3(center - p, "w")
         Plot3.plot_p3(center + p, "w")
+    
+    @staticmethod
+    def set_box(front_down_left:P3,back_top_right:P3)->None:
+        Plot3.plot_p3(front_down_left,'w')
+        Plot3.plot_p3(back_top_right,'w')
 
     @staticmethod
     def off_axis() -> None:
-        Plot3.ax.get_xaxis().set_visible(False)
-        Plot3.ax.get_yaxis().set_visible(False)
+        Plot3.PLT.axis('off')
 
     @staticmethod
     def remove_background_color() -> None:
@@ -2969,15 +2984,12 @@ class Plot3:
             raise RuntimeError("Plot3::请在show前调用plot")
 
         plt.show()
-    
+
     @staticmethod
     def __logo__():
         LOGO = Trajectory.__cctpy__()
-        Plot3.plot_line2s(LOGO,[1*M],['r-','r-','r-','b-','b-'])
-        Plot3.remove_background_color()
-        Plot3.PLT.axis('off')
+        Plot3.plot_line2s(LOGO, [1 * M], ["r-", "r-", "r-", "b-", "b-"])
         Plot3.show()
-
 
 
 class Plot2:
@@ -3253,6 +3265,7 @@ __global__ void magnet_solo_cct(float *winding, float *p, int *length, float *re
             )
             print(p)
             return P3.from_numpy_ndarry(ret * magnet.current * 1e-7)
+
 
 if __name__ == "__main__":
     DL2 = 2.1162209
