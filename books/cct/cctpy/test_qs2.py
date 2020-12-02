@@ -20,6 +20,12 @@ qs = QS.create_qs_along(
 
 qs.local_coordinate_system.location -= qs.local_coordinate_system.XI * 30 * MM
 
+p = ParticleFactory.create_proton_along(trajectory,s=0.0,kinetic_MeV=250.0)
+
+t = ParticleRunner.run_get_trajectory(p,qs,length=trajectory.get_length())
+
+Plot3.plot_p3s(t,'r-')
+
 Plot3.plot_line2(trajectory, describe="y--")
 Plot3.plot_qs(qs, describe="b-")
 Plot3.plot_local_coordinate_system(

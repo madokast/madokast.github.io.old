@@ -2,11 +2,12 @@
 CCT 建模优化全套解决方案
 文档见 introduction2cctpy.ipynb
 """
-from typing import Callable, Generic, List, TypeVar
+from typing import Callable, Generic, List, TypeVar, Union
 import matplotlib.pyplot as plt
 import math
 import sys
 import numpy
+from numpy.core.fromnumeric import size
 from numpy.lib.function_base import gradient
 
 GPU_ON: bool = True
@@ -380,6 +381,12 @@ class P2:
         """
         return self.__mul__(other)
 
+    def __truediv__(self, number: Union[int, float]):
+        if isinstance(number, int) or isinstance(number, float):
+            return self * (1 / number)
+        else:
+            raise ValueError("P2仅支持数字除法")
+
     def angle_to(self, other) -> float:
         """
         矢量 self 到 另一个矢量 other 的夹角
@@ -533,6 +540,12 @@ class P3:
         当左操作数不支持相应的操作时被调用
         """
         return self.__mul__(other)
+
+    def __truediv__(self, number: Union[int, float]):
+        if isinstance(number, int) or isinstance(number, float):
+            return self * (1 / number)
+        else:
+            raise ValueError("P2仅支持数字除法")
 
     def __matmul__(self, other):
         """
@@ -2322,9 +2335,6 @@ class PhaseSpaceParticle:
     def copy(self):
         return PhaseSpaceParticle(self.x, self.xp, self.y, self.yp, self.z, self.delta)
 
-    def getDelta(self):
-        return self.delta
-
 
 class ParticleFactory:
     """
@@ -2374,6 +2384,16 @@ class ParticleFactory:
 
         return RunningParticle(
             position, velocity, relativistic_mass, Protons.CHARGE_QUANTITY, speed
+        )
+
+    @staticmethod
+    def create_proton_along(
+        trajectory: Line2, s: float = 0.0, kinetic_MeV: float = 250
+    ):
+        return ParticleFactory.create_proton(
+            trajectory.point_at(s).to_p3(),
+            trajectory.direct_at(s).to_p3(),
+            kinetic_MeV=kinetic_MeV,
         )
 
     @staticmethod
@@ -2723,7 +2743,7 @@ class QS(Magnet, ApertureObject):
 
     ① QS 磁铁入口中心位置，是局部坐标系的原心
     ② 理想粒子运动方向，是局部坐标系 Z 方向
-    ③ 像空间中 X 方向
+    ③ 相空间中 X 方向
     因此，垂直屏幕向外（向面部）是 Y 方向
 
     """
@@ -2933,14 +2953,14 @@ class Plot3:
             qs.local_coordinate_system.point_to_global_coordinate(p)
             for p in back_circle_local
         ]
-        
+
         Plot3.plot_p3s(front_circle, describe)
         Plot3.plot_p3s(mid_circle, describe)
         Plot3.plot_p3s(back_circle, describe)
 
         # 画轴线
-        for i in range(0,360,10):
-            Plot3.plot_p3s([front_circle[i], back_circle[i]],describe)
+        for i in range(0, 360, 10):
+            Plot3.plot_p3s([front_circle[i], back_circle[i]], describe)
 
     @staticmethod
     def plot_local_coordinate_system(
@@ -2962,15 +2982,15 @@ class Plot3:
         p = P3(cube_size, cube_size, cube_size)
         Plot3.plot_p3(center - p, "w")
         Plot3.plot_p3(center + p, "w")
-    
+
     @staticmethod
-    def set_box(front_down_left:P3,back_top_right:P3)->None:
-        Plot3.plot_p3(front_down_left,'w')
-        Plot3.plot_p3(back_top_right,'w')
+    def set_box(front_down_left: P3, back_top_right: P3) -> None:
+        Plot3.plot_p3(front_down_left, "w")
+        Plot3.plot_p3(back_top_right, "w")
 
     @staticmethod
     def off_axis() -> None:
-        Plot3.PLT.axis('off')
+        Plot3.PLT.axis("off")
 
     @staticmethod
     def remove_background_color() -> None:
@@ -3094,6 +3114,29 @@ class Plot2:
         if not Plot2.INIT:
             Plot2.__init()
         plt.axis("equal")
+
+    @staticmethod
+    def info(
+        x_label: str = "",
+        y_label: str = "",
+        title: str = "",
+        font_size: int = 12,
+        font_family: str = "Times New Roman",
+    ):
+        if not Plot2.INIT:
+            Plot2.__init()
+
+        font_label = {
+            "family": font_family,
+            "weight": "normal",
+            "size": font_size,
+        }
+        plt.xlabel(xlabel=x_label, fontdict=font_label)
+        plt.ylabel(ylabel=y_label, fontdict=font_label)
+        plt.title(label=title, fontdict=font_label)
+
+        plt.xticks(fontproperties=font_family, size=font_size)
+        plt.yticks(fontproperties=font_family, size=font_size)
 
     @staticmethod
     def show():
