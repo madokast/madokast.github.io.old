@@ -1526,6 +1526,13 @@ class Magnet:
     ) -> None:
         raise NotImplementedError
 
+    @staticmethod
+    def no_magnet():
+        class NoMagnet(Magnet):
+            def magnetic_field_at(self, point: P3) -> P3:
+                return P3.zeros()
+        return NoMagnet()
+
 
 class ApertureObject:
     """
@@ -1533,7 +1540,7 @@ class ApertureObject:
     可以判断点 point 是在这个对象的孔径内还是孔径外
     """
 
-    def is_out_of_aperture(point: P3) -> bool:
+    def is_out_of_aperture(self, point: P3) -> bool:
         """
         判断点 point 是在这个对象的孔径内还是孔径外
         """
@@ -2091,7 +2098,7 @@ class PhaseSpaceParticle:
         D: float = 1
 
         return [
-            PhaseSpaceParticle(p[0], p[1], 0, 0, 0, delta)
+            PhaseSpaceParticle(p.x, p.y, 0, 0, 0, delta)
             for p in BaseUtils.Ellipse(
                 A, B, C, D
             ).uniform_distribution_points_along_edge(number)
@@ -2121,7 +2128,7 @@ class PhaseSpaceParticle:
         D: float = 1
 
         return [
-            PhaseSpaceParticle(0, 0, p[0], p[1], 0, delta)
+            PhaseSpaceParticle(0, 0, p.x, p.y, 0, delta)
             for p in BaseUtils.Ellipse(
                 A, B, C, D
             ).uniform_distribution_points_along_edge(number)
@@ -3035,9 +3042,23 @@ class Plot2:
             Plot2.__init()
 
         plt.plot(p.x, p.y, describe)
+    
+    @staticmethod
+    def plot_p3(p: P3, describe="r") -> None:
+        if not Plot2.INIT:
+            Plot2.__init()
+
+        plt.plot(p.x, p.y, describe)
 
     @staticmethod
     def plot_p2s(ps: List[P2], describe="r-") -> None:
+        if not Plot2.INIT:
+            Plot2.__init()
+
+        plt.plot([p.x for p in ps], [p.y for p in ps], describe)
+    
+    @staticmethod
+    def plot_p3s(ps: List[P3], describe="r-") -> None:
         if not Plot2.INIT:
             Plot2.__init()
 
