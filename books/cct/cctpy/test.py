@@ -145,9 +145,11 @@ class P2Case(unittest.TestCase):
 
             diff = a - b
 
+            # print(p1.angle_to(p2),diff)
+
             self.assertTrue(
                 BaseUtils.equal(
-                    p1.angle_to(p2), diff if diff < np.pi else 2 * np.pi - diff
+                    p2.angle_to(p1), diff #if diff >0 else 2 * np.pi - diff
                 )
             )
 
@@ -360,11 +362,12 @@ class TrajectoryTestCase(unittest.TestCase):
             0.5, 0
         )
 
-        # Plot3.plot3d(c1, describe='r')
-        # Plot3.plot3d(c2, describe='b')
-        # Plot3.plot3d(t, describe='g')
-        #
-        # Plot3.show()
+        Plot3.plot_line2(c1, describe='r')
+        Plot3.plot_line2(c2, describe='b')
+        Plot3.plot_line2(t, describe='g')
+        Plot3.set_center()
+        
+        Plot3.show()
 
         self.assertTrue(True)
 
@@ -414,13 +417,13 @@ class QsTest(unittest.TestCase):
         lc = LocalCoordinateSystem(P3(),-P3.x_direct(),P3.y_direct())
         qs = QS(lc, length, g, L, aper)
 
-        m = qs.magnetic_field_at_cpu(P3(10 * MM, 0.1, 0.0))
+        m = qs.magnetic_field_at(P3(10 * MM, 0.1, 0.0))
         self.assertTrue(m == P3(0.0, 0.0, -0.1))
 
-        m = qs.magnetic_field_at_cpu(P3(15 * MM, 0.1, 0.0))
+        m = qs.magnetic_field_at(P3(15 * MM, 0.1, 0.0))
         self.assertTrue(m == P3(0.0, 0.0, -0.15))
 
-        m = qs.magnetic_field_at_cpu(P3(15 * MM, 0.1, 5 * MM))
+        m = qs.magnetic_field_at(P3(15 * MM, 0.1, 5 * MM))
         self.assertTrue(m == P3(-0.05, -3.061616997868383e-18, -0.15))
 
     def test_quad_1(self):
@@ -437,13 +440,13 @@ class QsTest(unittest.TestCase):
         lc = LocalCoordinateSystem(P3(),-P3.x_direct(),P3.y_direct())
         qs = QS(lc, length, g, L, aper)
 
-        m = qs.magnetic_field_at_cpu(P3(10 * MM, 0.1, 0))
+        m = qs.magnetic_field_at(P3(10 * MM, 0.1, 0))
         self.assertTrue(m == P3(0.0, 0.0, 0.457))
 
-        m = qs.magnetic_field_at_cpu(P3(15 * MM, 0.1, 0))
+        m = qs.magnetic_field_at(P3(15 * MM, 0.1, 0))
         self.assertTrue(m == P3(0.0, 0.0, 0.6855))
 
-        m = qs.magnetic_field_at_cpu(P3(15 * MM, 0.1, 5 * MM))
+        m = qs.magnetic_field_at(P3(15 * MM, 0.1, 5 * MM))
         self.assertTrue(m == P3(0.2285, 1.399158968025851e-17, 0.6855))
 
 

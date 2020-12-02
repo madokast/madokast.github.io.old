@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import math
 import sys
 import numpy
+from numpy.lib.function_base import gradient
 
 GPU_ON: bool = True
 
@@ -604,114 +605,6 @@ class P3:
         return transformation(p)
 
 
-class ValueWithDistance(Generic[T]):
-    """
-    辅助对象，带有距离的一个量，通常用于描述线上磁场分布
-    """
-
-    def __init__(self, value: T, distance: float) -> None:
-        self.value: T = value
-        self.distance: float = distance
-
-
-class Magnet:
-    """
-    表示一个可以求磁场的对象，如 CCT 、 QS 磁铁
-    所有实现此接口的类，可以计算出它在某一点的磁场
-
-    本类（接口）只有一个接口方法 magnetic_field_at
-    """
-
-    def magnetic_field_at(self, point: P3) -> P3:
-        """
-        获得本对象 self 在点 point 处产生的磁场
-        这个方法需要在子类中实现/重写
-        ----------
-        point 三维笛卡尔坐标系中的点，即一个三维矢量，如 [0,0,0]
-
-        Returns 本对象 self 在点 point 处的磁场，用三维矢量表示
-        -------
-        """
-        raise NotImplementedError
-
-    def magnetic_field_along(
-        self, line2, step: float = 1 * MM
-    ) -> List[ValueWithDistance[P3]]:
-        """
-        计算本对象在三维曲线 line 上的磁场分布
-        ----------
-        line 由离散点组成的三维曲线
-
-        Returns 本对象在三维曲线 line 上的磁场分布，用三维矢量的数组表示
-        -------
-        """
-        length = line2.get_length()
-        distances = BaseUtils.linspace(0, length, int(length / step))
-        return [
-            ValueWithDistance(self.magnetic_field_at(line2.point_at(d).to_p3()), d)
-            for d in distances
-        ]
-
-    def magnetic_field_bz_along(self, line, step: float = 1 * MM) -> List[P2]:
-        ms: List[ValueWithDistance[P3]] = self.magnetic_field_along(line, step)
-        return [P2(p3d.distance, p3d.value.z) for p3d in ms]
-
-    def graident_field_along(
-        self,
-        line,
-        good_field_area_width: float = 10 * MM,
-        step: float = 1 * MM,
-        point_number: int = 4,
-    ) -> List[P2]:
-        raise NotImplementedError
-
-    def second_graident_field_along(
-        self,
-        line,
-        good_field_area_width: float = 10 * MM,
-        step: float = 1 * MM,
-        point_number: int = 4,
-    ) -> List[P2]:
-        raise NotImplementedError
-
-    def multipole_field_along(
-        self,
-        line,
-        order: int,
-        good_field_area_width: float = 10 * MM,
-        step: float = 1 * MM,
-        point_number: int = 4,
-    ) -> List[List[P2]]:
-        raise NotImplementedError
-
-    def integration_field(self, line, step: float = 1 * MM) -> float:
-        raise NotADirectoryError
-
-    def slice_to_cosy_script(
-        self,
-        Bp: float,
-        aperture_radius: float,
-        line,
-        good_field_area_width: float,
-        min_step_length: float,
-        tolerance: float,
-    ) -> None:
-        raise NotImplementedError
-
-
-class ApertureObject:
-    """
-    表示具有孔径的一个对象
-    可以判断点 point 是在这个对象的孔径内还是孔径外
-    """
-
-    def is_out_of_aperture(point: P3) -> bool:
-        """
-        判断点 point 是在这个对象的孔径内还是孔径外
-        """
-        raise NotImplementedError
-
-
 class LocalCoordinateSystem:
     """
     局部坐标系。
@@ -853,6 +746,16 @@ class LocalCoordinateSystem:
 
         """
         return LocalCoordinateSystem()
+
+
+class ValueWithDistance(Generic[T]):
+    """
+    辅助对象，带有距离的一个量，通常用于描述线上磁场分布
+    """
+
+    def __init__(self, value: T, distance: float) -> None:
+        self.value: T = value
+        self.distance: float = distance
 
 
 class Line2:
@@ -1006,18 +909,50 @@ class Line2:
             self.point_at(s) for s in BaseUtils.linspace(0, self.get_length(), number)
         ]
 
-    def disperse3d(self, step: float = 1.0 * MM) -> List[P3]:
+    def disperse2d_with_distance(
+        self, step: float = 1.0 * MM
+    ) -> List[ValueWithDistance[P2]]:
+        """
+        同方法 disperse2d
+        每个离散点带有距离，返回值是 ValueWithDistance[P2] 的数组
+        """
+        number: int = int(math.ceil(self.get_length() / step))
+        return [
+            ValueWithDistance(self.point_at(s), s)
+            for s in BaseUtils.linspace(0, self.get_length(), number)
+        ]
+
+    def disperse3d(
+        self,
+        p2_t0_p3: Callable[[P2], P3] = lambda p2: P3(p2.x, p2.y, 0.0),
+        step: float = 1.0 * MM,
+    ) -> List[P3]:
         """
         三维离散轨迹点，其中第三维 z == 0.0
         Parameters
         ----------
         step 步长
+        p2_t0_p3：二维点 P2 到三维点 P3 转换函数，默认 z=0
 
-        Returns 二维离散轨迹点
+        Returns 三维离散轨迹点
         -------
 
         """
-        return [p.to_p3() for p in self.disperse2d(step)]
+        return [p.to_p3(p2_t0_p3) for p in self.disperse2d(step)]
+
+    def disperse3d_with_distance(
+        self,
+        p2_t0_p3: Callable[[P2], P3] = lambda p2: P3(p2.x, p2.y, 0.0),
+        step: float = 1.0 * MM,
+    ) -> List[ValueWithDistance[P3]]:
+        """
+        同 disperse3d
+        每个离散点带有距离，返回值是 ValueWithDistance[P3] 的数组
+        """
+        return [
+            ValueWithDistance(P3)(vp2.value.to_p3(p2_t0_p3), vp2.distance)
+            for vp2 in self.disperse2d_with_distance(step)
+        ]
 
     def __str__(self):
         return f"Line2，起点{self.point_at_start()}，长度{self.get_length()}"
@@ -1312,6 +1247,284 @@ class Trajectory(Line2):
                 return Trajectory(StraightLine2(length, direct, self.start_point))
 
         return TrajectoryBuilder(start_point)
+
+    @classmethod
+    def __cctpy__(cls) -> List[Line2]:
+        """
+        彩蛋
+        """
+        width = 40
+        c_angle = 300
+        r = 1 * MM
+        c_r = 100
+        C1 = (
+            Trajectory.set_start_point(start_point=P2(176, 88))
+            .first_line2(
+                direct=P2.x_direct().rotate(
+                    BaseUtils.angle_to_radian(360 - c_angle) / 2
+                ),
+                length=width,
+            )
+            .add_arc_line(radius=r, clockwise=False, angle_deg=90)
+            .add_arc_line(radius=c_r, clockwise=False, angle_deg=c_angle)
+            .add_arc_line(radius=r, clockwise=False, angle_deg=90)
+            .add_strait_line(length=width)
+            .add_arc_line(radius=r, clockwise=False, angle_deg=90)
+            .add_arc_line(radius=c_r - width, clockwise=True, angle_deg=c_angle)
+        )
+        C2 = C1 + P2(200, 0)
+
+        t_width = 190
+        t_height = 190
+
+        T = (
+            Trajectory.set_start_point(start_point=P2(430, 155))
+            .first_line2(direct=P2.x_direct(), length=t_width)
+            .add_arc_line(radius=r, clockwise=True, angle_deg=90)
+            .add_strait_line(length=width)
+            .add_arc_line(radius=r, clockwise=True, angle_deg=90)
+            .add_strait_line(length=(t_width / 2 - width / 2))
+            .add_arc_line(radius=r, clockwise=False, angle_deg=90)
+            .add_strait_line(length=t_height - width)
+            .add_arc_line(radius=r, clockwise=True, angle_deg=90)
+            .add_strait_line(length=width)
+            .add_arc_line(radius=r, clockwise=True, angle_deg=90)
+            .add_strait_line(length=t_height - width)
+            .add_arc_line(radius=r, clockwise=False, angle_deg=90)
+            .add_strait_line(length=(t_width / 2 - width / 2))
+            .add_arc_line(radius=r, clockwise=True, angle_deg=90)
+            .add_strait_line(length=width)
+        ) + P2(0, -5)
+
+        p_height = t_height
+        p_r = 50
+        width = 45
+
+        P_out = (
+            Trajectory.set_start_point(start_point=P2(655, 155))
+            .first_line2(direct=P2.x_direct(), length=2 * width)
+            .add_arc_line(radius=p_r, clockwise=True, angle_deg=180)
+            .add_strait_line(length=width)
+            .add_arc_line(radius=r, clockwise=False, angle_deg=90)
+            .add_strait_line(length=p_height - p_r * 2)
+            .add_arc_line(radius=r, clockwise=True, angle_deg=90)
+            .add_strait_line(length=width)
+            .add_arc_line(radius=r, clockwise=True, angle_deg=90)
+            .add_strait_line(length=p_height)
+        ) + P2(0, -5)
+
+        P_in = (
+            Trajectory.set_start_point(
+                start_point=P_out.point_at(width) - P2(0, width * 0.6)
+            )
+            .first_line2(direct=P2.x_direct(), length=width)
+            .add_arc_line(radius=p_r - width * 0.6, clockwise=True, angle_deg=180)
+            .add_strait_line(length=width)
+            .add_arc_line(radius=r, clockwise=True, angle_deg=90)
+            .add_strait_line(length=(p_r - width * 0.6) * 2)
+        )
+
+        width = 40
+        y_width = 50
+        y_heigt = t_height
+        y_tilt_len = 120
+
+        Y = (
+            Trajectory.set_start_point(start_point=P2(810, 155))
+            .first_line2(direct=P2.x_direct(), length=width)
+            .add_arc_line(radius=r, clockwise=True, angle_deg=60)
+            .add_strait_line(length=y_tilt_len)
+            .add_arc_line(radius=r, clockwise=False, angle_deg=120)
+            .add_strait_line(length=y_tilt_len)
+            .add_arc_line(radius=r, clockwise=True, angle_deg=60)
+            .add_strait_line(length=width)
+            .add_arc_line(radius=r, clockwise=True, angle_deg=120)
+            .add_strait_line(length=y_tilt_len * 1.3)
+            .add_arc_line(radius=r, clockwise=False, angle_deg=30)
+            .add_strait_line(length=t_height * 0.4)
+            .add_arc_line(radius=r, clockwise=True, angle_deg=90)
+            .add_strait_line(length=width * 1.1)
+            .add_arc_line(radius=r, clockwise=True, angle_deg=90)
+            .add_strait_line(length=t_height * 0.4)
+            .add_arc_line(radius=r, clockwise=False, angle_deg=30)
+            .add_strait_line(length=y_tilt_len * 1.3)
+        )
+
+        return [C1, C2, T, P_in, P_out, Y]
+
+
+class Magnet:
+    """
+    表示一个可以求磁场的对象，如 CCT 、 QS 磁铁
+    所有实现此接口的类，可以计算出它在某一点的磁场
+
+    本类（接口）只有一个接口方法 magnetic_field_at
+    """
+
+    def magnetic_field_at(self, point: P3) -> P3:
+        """
+        获得本对象 self 在点 point 处产生的磁场
+        这个方法需要在子类中实现/重写
+        ----------
+        point 三维笛卡尔坐标系中的点，即一个三维矢量，如 [0,0,0]
+
+        Returns 本对象 self 在点 point 处的磁场，用三维矢量表示
+        -------
+        """
+        raise NotImplementedError
+
+    def magnetic_field_along(
+        self,
+        line2: Line2,
+        p2_t0_p3: Callable[[P2], P3] = lambda p2: P3(p2.x, p2.y, 0.0),
+        step: float = 1 * MM,
+    ) -> List[ValueWithDistance[P3]]:
+        """
+        计算本对象在二维曲线 line2 上的磁场分布
+        p2_t0_p3 是一个函数，用于把 line2 上的二维点转为三维，默认转为 z=0 的三维点
+        step 表示 line2 分段长度
+        -------
+        """
+        length = line2.get_length()
+        distances = BaseUtils.linspace(0, length, int(length / step))
+        return [
+            ValueWithDistance(
+                self.magnetic_field_at(
+                    line2.point_at(d).to_p3(transformation=p2_t0_p3)
+                ),
+                d,
+            )
+            for d in distances
+        ]
+
+    def magnetic_field_bz_along(
+        self,
+        line2: Line2,
+        p2_t0_p3: Callable[[P2], P3] = lambda p2: P3(p2.x, p2.y, 0.0),
+        step: float = 1 * MM,
+    ) -> List[P2]:
+        """
+        计算本对象在二维曲线 line 上的磁场 Z 方向分量的分布
+        因为磁铁一般放置在 XY 平面，所以 Bz 一般可以看作自然坐标系下 By，也就是二级场大小
+        p2_t0_p3 是一个函数，用于把 line2 上的二维点转为三维，默认转为 z=0 的三维点
+        step 表示 line2 分段长度
+
+        返回 P2 的数组，P2 中 x 表示曲线 line2 上距离 s，y 表示前述距离对应的点的磁场 bz
+        """
+        ms: List[ValueWithDistance[P3]] = self.magnetic_field_along(
+            line2, p2_t0_p3=p2_t0_p3, step=step
+        )
+        return [P2(p3d.distance, p3d.value.z) for p3d in ms]
+
+    def graident_field_along(
+        self,
+        line2: Line2,
+        good_field_area_width: float = 10 * MM,
+        step: float = 1 * MM,
+        point_number: int = 4,
+    ) -> List[P2]:
+        """
+        计算本对象在二维曲线 line2 上的磁场梯度的分布
+        每一点的梯度，采用这点水平垂线上 Bz 的多项式拟合得到
+        good_field_area_width：水平垂线的长度，注意应小于等于好场区范围
+        step：line2 上取点间距
+        point_number：水平垂线上取点数目，越多则拟合越精确
+        """
+        # 拟合阶数
+        fit_order: int = 1
+
+        # 自变量
+        xs: List[float] = BaseUtils.linspace(
+            -good_field_area_width / 2, good_field_area_width / 2, point_number
+        )
+
+        # line2 长度
+        length = line2.get_length()
+
+        # 离散距离
+        distances = BaseUtils.linspace(0, length, int(length / step))
+
+        # 返回值
+        ret: List[P2] = []
+
+        for s in distances:
+            right_hand_point: P3 = line2.right_hand_side_point(
+                s=s, d=good_field_area_width / 2
+            ).to_p3()
+            left_hand_point: P3 = line2.left_hand_side_point(
+                s=s, d=good_field_area_width / 2
+            ).to_p3()
+
+            points: List[P3] = BaseUtils.linspace(
+                right_hand_point, left_hand_point, point_number
+            )
+
+            # 磁场 bz
+            ys: List[float] = [self.magnetic_field_at(p).z for p in points]
+
+            # 拟合
+            gradient: float = BaseUtils.polynomial_fitting(xs, ys, fit_order)[1]
+
+            ret.append(P2(s, gradient))
+        return ret
+
+    def second_graident_field_along(
+        self,
+        line2: Line2,
+        good_field_area_width: float = 10 * MM,
+        step: float = 1 * MM,
+        point_number: int = 4,
+    ) -> List[P2]:
+        """
+        计算本对象在二维曲线 line2 上的磁场二阶梯度的分布（六极场）
+        每一点的梯度，采用这点水平垂线上 Bz 的多项式拟合得到
+        good_field_area_width：水平垂线的长度，注意应小于等于好场区范围
+        step：line2 上取点间距
+        point_number：水平垂线上取点数目，越多则拟合越精确
+        """
+        raise NotImplementedError
+
+    def multipole_field_along(
+        self,
+        line2: Line2,
+        order: int,
+        good_field_area_width: float = 10 * MM,
+        step: float = 1 * MM,
+        point_number: int = 4,
+    ) -> List[List[P2]]:
+        raise NotImplementedError
+
+    def integration_field(
+        self,
+        line2: Line2,
+        p2_t0_p3: Callable[[P2], P3] = lambda p2: P3(p2.x, p2.y, 0.0),
+        step: float = 1 * MM,
+    ) -> float:
+        raise NotImplementedError
+
+    def slice_to_cosy_script(
+        self,
+        Bp: float,
+        aperture_radius: float,
+        line2: Line2,
+        good_field_area_width: float,
+        min_step_length: float,
+        tolerance: float,
+    ) -> None:
+        raise NotImplementedError
+
+
+class ApertureObject:
+    """
+    表示具有孔径的一个对象
+    可以判断点 point 是在这个对象的孔径内还是孔径外
+    """
+
+    def is_out_of_aperture(point: P3) -> bool:
+        """
+        判断点 point 是在这个对象的孔径内还是孔径外
+        """
+        raise NotImplementedError
 
 
 class Protons:
@@ -2594,7 +2807,7 @@ class QS(Magnet, ApertureObject):
 
 class Beamline(Magnet):
     def __init__(self) -> None:
-        self.magnets: List[Magnet] = list[Magnet]()
+        self.magnets: List[Magnet] = []
 
     def magnetic_field_at(self, point: P3) -> P3:
         b: P3 = P3.zeros()
@@ -2610,6 +2823,7 @@ class Beamline(Magnet):
 class Plot3:
     INIT: bool = False
     ax = None
+    PLT = plt
 
     @staticmethod
     def __init():
@@ -2643,8 +2857,20 @@ class Plot3:
         Plot3.ax.plot([p.x for p in ps], [p.y for p in ps], [p.z for p in ps], describe)
 
     @staticmethod
-    def plot_line2(line2: Line2, step: float = 1 * MM, describe="r"):
-        Plot3.plot_p3s(line2.disperse3d(step), describe)
+    def plot_line2(line2: Line2, step: float = 1 * MM, describe="r") -> None:
+        Plot3.plot_p3s(line2.disperse3d(step=step), describe)
+
+    @staticmethod
+    def plot_line2s(
+        line2s: List[Line2], steps: List[float] = [1 * MM], describes: List[str] = ["r"]
+    ) -> None:
+        length = len(line2s)
+        for i in range(length):
+            Plot3.plot_line2(
+                line2=line2s[i],
+                step=steps[i] if i < len(steps) else steps[-1],
+                describe=describes[i] if i < len(describes) else describes[-1],
+            )
 
     @staticmethod
     def plot_beamline(beamline: Beamline, describes=["r-"]) -> None:
@@ -2727,11 +2953,31 @@ class Plot3:
         Plot3.plot_p3(center + p, "w")
 
     @staticmethod
+    def off_axis() -> None:
+        Plot3.ax.get_xaxis().set_visible(False)
+        Plot3.ax.get_yaxis().set_visible(False)
+
+    @staticmethod
+    def remove_background_color() -> None:
+        Plot3.ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+        Plot3.ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+        Plot3.ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+
+    @staticmethod
     def show():
         if not Plot3.INIT:
             raise RuntimeError("Plot3::请在show前调用plot")
 
         plt.show()
+    
+    @staticmethod
+    def __logo__():
+        LOGO = Trajectory.__cctpy__()
+        Plot3.plot_line2s(LOGO,[1*M],['r-','r-','r-','b-','b-'])
+        Plot3.remove_background_color()
+        Plot3.PLT.axis('off')
+        Plot3.show()
+
 
 
 class Plot2:
@@ -3008,7 +3254,6 @@ __global__ void magnet_solo_cct(float *winding, float *p, int *length, float *re
             print(p)
             return P3.from_numpy_ndarry(ret * magnet.current * 1e-7)
 
-
 if __name__ == "__main__":
     DL2 = 2.1162209
     GAP3 = 0.1978111
@@ -3182,14 +3427,16 @@ if __name__ == "__main__":
             )
         )
 
-    Plot3.plot_line2(trajectory_part2)
-    Plot3.plot_beamline(beamline, ["r-", "g-", "y-", "b-"])
+    # Plot3.plot_line2(trajectory_part2)
+    # Plot3.plot_beamline(beamline, ["r-", "g-", "y-", "b-"])
 
-    # Plot2.plot_p2s(beamline.magnetic_field_bz_along(trajectory_part2))
+    Plot2.plot_p2s(beamline.graident_field_along(trajectory_part2))
 
     # print(beamline.magnetic_field_at(trajectory_part2.point_at(DL2).to_p3()))
     # print(beamline.magnetic_field_at(trajectory_part2.point_at(DL2).to_p3()))
 
-    # Plot2.equal()
-    Plot3.set_center(trajectory_part2.point_at(DL2).to_p3(), 5)
-    Plot3.show()
+    Plot2.equal()
+    # Plot3.set_center(trajectory_part2.point_at(DL2).to_p3(), 5)
+    # Plot3.show()
+
+    Plot2.show()
