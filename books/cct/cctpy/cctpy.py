@@ -2,23 +2,11 @@
 CCT 建模优化全套解决方案
 文档见 introduction2cctpy.ipynb
 """
-from typing import Callable, Generic, List, TypeVar, Union
+from typing import Callable, Generic, List, Optional, Tuple, TypeVar, Union
 import matplotlib.pyplot as plt
 import math
 import sys
 import numpy
-from numpy.core.fromnumeric import size
-from numpy.lib.function_base import gradient
-
-GPU_ON: bool = True
-
-try:
-    import pycuda.autoinit
-    import pycuda.driver as drv
-    from pycuda.compiler import SourceModule
-except ModuleNotFoundError as me:
-    GPU_ON = False
-    print("注意：没有安装 PYCUDA，无法使用 GPU 加速")
 
 # 常量
 M: float = 1.0  # 一米
@@ -30,244 +18,7 @@ J: float = 1.0  # 焦耳
 eV = 1.6021766208e-19 * J  # 电子伏特转焦耳
 MeV = 1000 * 1000 * eV  # 兆电子伏特
 MeV_PER_C = 5.3442857792e-22  # kg m/s 动量单位
-T = TypeVar("T")  # 泛型，把 python 不当作脚本时建议使用
-
-
-class BaseUtils:
-    """
-    这里存放一些简单的工具，如
-    1. 判断两个对象是否相等
-    2. numpy 中用于生成均匀分布的 linspace 方法
-    3. 角度转弧度 angle_to_radian 和 弧度转角度 radian_to_angle
-    4. 打印函数调用栈 print_traceback （这个主要用于 debug）
-    5. 椭圆。用于生成椭圆圆周上均匀分布的若干点
-    """
-
-    @staticmethod
-    def equal(a, b, err: float = 1e-6, msg: str = None) -> bool:
-        """
-        判断 a b 是否相等，相等返回 true
-        当 a b 不相等时，若 msg 为空，返回 flase，否则抛出异常，异常信息即 msg
-
-        示例：
-        """
-        if (isinstance(a, float) or isinstance(a, int)) and (
-            isinstance(b, float) or isinstance(b, int)
-        ):
-            if (
-                a == b
-                or abs(a - b) <= err
-                or ((a + b != 0.0) and ((2 * abs((a - b) / (a + b))) <= err))
-            ):
-                return True
-            else:
-                if msg is None:
-                    return False
-                else:
-                    raise AssertionError(msg)
-        elif (isinstance(a, P2) and isinstance(b, P2)) or (
-            isinstance(a, P3) and isinstance(b, P3)
-        ):
-            if a.__eq__(b, err=err, msg=msg):
-                return True
-            else:
-                if msg is None:
-                    return False
-                else:
-                    raise AssertionError(msg)
-        else:
-            if a == b:
-                return True
-            else:
-                if msg is None:
-                    return False
-                else:
-                    raise AssertionError(msg)
-
-    @staticmethod
-    def linspace(start, end, number: int) -> List:
-        """
-        同 numpy 的 linspace
-        """
-        # 除法改成乘法以适应 P2 P3 对象
-        d = (end - start) * (1 / (number - 1))
-        # i 转为浮点以适应 P2 P3 对象
-        return [start + d * float(i) for i in range(number)]
-
-    @staticmethod
-    def angle_to_radian(deg):
-        if isinstance(deg, float) or isinstance(deg, int):
-            return deg / 180.0 * math.pi
-        elif isinstance(deg, List):
-            return [BaseUtils.angle_to_radian(d) for d in deg]
-        else:
-            raise NotImplementedError
-
-    @staticmethod
-    def radian_to_angle(rad):
-        if isinstance(rad, float) or isinstance(rad, int):
-            return rad * 180.0 / math.pi
-        elif isinstance(rad, List):
-            return [BaseUtils.radian_to_angle(d) for d in rad]
-        else:
-            raise NotImplementedError
-
-    @staticmethod
-    def circle_center_and_radius(p1, p2, p3):
-        """
-        已知三个二维点 p1 p2 p3
-        求由这三个点组成的圆的圆心和半径
-        方法来自：https://blog.csdn.net/liutaojia/article/details/83625151
-        """
-        x1 = p1.x
-        x2 = p2.x
-        x3 = p3.x
-        y1 = p1.y
-        y2 = p2.y
-        y3 = p3.y
-        z1 = x2 ** 2 + y2 ** 2 - x1 ** 2 - y1 ** 2
-        z2 = x3 ** 2 + y3 ** 2 - x1 ** 2 - y1 ** 2
-        z3 = x3 ** 2 + y3 ** 2 - x2 ** 2 - y2 ** 2
-        A = numpy.array(
-            [[(x2 - x1), (y2 - y1)], [(x3 - x1), (y3 - y1)], [(x3 - x2), (y3 - y2)]]
-        )
-        B = 0.5 * numpy.array([[z1], [z2], [z3]])
-        c = numpy.linalg.inv(A.T @ A) @ A.T @ B
-        c = P2.from_numpy_ndarry(c)
-        # c = (A'*A)\A'*B;
-        R1 = math.sqrt((c.x - x1) ** 2 + (c.y - y1) ** 2)
-        R2 = math.sqrt((c.x - x2) ** 2 + (c.y - y2) ** 2)
-        R3 = math.sqrt((c.x - x3) ** 2 + (c.y - y3) ** 2)
-        R = (R1 + R2 + R3) / 3
-        return (c, R)
-
-    @staticmethod
-    def polynomial_fitting(xs: List[float], ys: List[float], order: int) -> List[float]:
-        """
-        多项式拟合
-        xs 自变量，ys 变量，拟合阶数为 order，返回一个数组
-        数组第 0 项为拟合常数项
-        数组第 i 项为拟合 i 次项
-        """
-        fit = numpy.polyfit(xs, ys, order)
-        return fit[::-1].tolist()
-
-    @staticmethod
-    def print_traceback():
-        """
-        打印函数调用栈
-        Returns
-        -------
-
-        """
-        f = sys._getframe()
-        while f is not None:
-            print(f)
-            f = f.f_back
-
-    class Ellipse:
-        """
-        椭圆类
-        Ax^2+Bxy+Cy^2=D
-        """
-
-        def __init__(self, A: float, B: float, C: float, D: float):
-            self.A = float(A)
-            self.B = float(B)
-            self.C = float(C)
-            self.D = float(D)
-
-        def point_at(self, theta: float):
-            """
-            原点出发，方向th弧度的射线和椭圆Ax^2+Bxy+Cy^2=D的交点
-            Parameters
-            ----------
-            theta 弧度
-
-            Returns 方向th弧度的射线和椭圆Ax^2+Bxy+Cy^2=D的交点
-            -------
-
-            """
-            d = P2()
-
-            while theta < 0:
-                theta += 2 * math.pi
-
-            while theta > 2 * math.pi:
-                theta -= 2 * math.pi
-
-            if BaseUtils.equal(theta, 0) or BaseUtils.equal(theta, 2 * math.pi):
-                d.x = math.sqrt(self.D / self.A)
-                d.y = 0
-
-            if BaseUtils.equal(theta, math.pi):
-                d.x = -math.sqrt(self.D / self.A)
-                d.y = 0
-
-            t = 0.0
-
-            if 0 < theta < math.pi:
-                t = 1 / math.tan(theta)
-                d.y = math.sqrt(self.D / (self.A * t * t + self.B * t + self.C))
-                d.x = t * d.y
-
-            if math.pi < theta < 2 * math.pi:
-                theta -= math.pi
-                t = 1 / math.tan(theta)
-                d.y = -math.sqrt(self.D / (self.A * t * t + self.B * t + self.C))
-                d.x = t * d.y
-
-            return d
-
-        @property
-        def circumference(self) -> float:
-            """
-            计算椭圆周长
-            Returns 计算椭圆周长
-            -------
-
-            """
-            num: int = 3600 * 4
-            c: float = 0.0
-            for i in range(num):
-                c += (
-                    self.point_at(2.0 * math.pi / float(num) * (i + 1))
-                    - self.point_at(2.0 * math.pi / float(num) * (i))
-                ).length()
-
-            return c
-
-        def point_after(self, length: float):
-            """
-            在椭圆 Ax^2+Bxy+Cy^2=D 上行走 length，返回此时的点
-            规定起点：椭圆与X轴正方向的交点
-            规定行走方向：逆时针
-            Parameters
-            ----------
-            length 行走距离
-
-            Returns 椭圆 Ax^2+Bxy+Cy^2=D 上行走 length，返回此时的点
-            -------
-
-            """
-            step_theta = BaseUtils.angle_to_radian(0.05)
-            theta = 0.0
-            while length > 0.0:
-                length -= (
-                    self.point_at(theta + step_theta) - self.point_at(theta)
-                ).length()
-
-                theta += step_theta
-
-            return self.point_at(theta)
-
-        def uniform_distribution_points_along_edge(self, num: int) -> List:
-            points = []
-            c = self.circumference
-            for i in range(num):
-                points.append(self.point_after(c / num * i))
-
-            return points
+T = TypeVar("T")  # 泛型，仅用于类型标记
 
 
 class P2:
@@ -285,43 +36,43 @@ class P2:
         """
         return math.sqrt(self.x ** 2 + self.y ** 2)
 
-    def normalize(self):
+    def normalize(self) -> "P2":
         """
         矢量长度归一，返回新矢量
         """
         return self * (1 / self.length())
 
-    def change_length(self, new_length: float):
+    def change_length(self, new_length: float) -> "P2":
         """
         改变长度，返回新矢量
         """
         return self.normalize() * float(new_length)
 
-    def copy(self):
+    def copy(self) -> "P2":
         """
         拷贝
         """
         return P2(self.x, self.y)
 
-    def __add__(self, other):
+    def __add__(self, other) -> "P2":
         """
         矢量加法，返回新矢量
         """
         return P2(self.x + other.x, self.y + other.y)
 
-    def __neg__(self):
+    def __neg__(self) -> "P2":
         """
         相反方向的矢量
         """
         return P2(-self.x, -self.y)
 
-    def __sub__(self, other):
+    def __sub__(self, other) -> "P2":
         """
         矢量减法，返回新矢量
         """
         return self.__add__(other.__neg__())
 
-    def __iadd__(self, other):
+    def __iadd__(self, other) -> "P2":
         """
         矢量原地相加，self 自身改变
         """
@@ -329,7 +80,7 @@ class P2:
         self.y += other.y
         return self  # 必须显式返回
 
-    def __isub__(self, other):
+    def __isub__(self, other) -> "P2":
         """
         矢量原地减法，self 自身改变
         """
@@ -337,7 +88,7 @@ class P2:
         self.y -= other.y
         return self
 
-    def __matmul(self, m: List[List[float]]):
+    def __matmul(self, m: List[List[float]]) -> "P2":
         """
         2*2矩阵和 self 相乘，仅仅用于矢量旋转
         """
@@ -352,7 +103,7 @@ class P2:
         """
         return [[math.cos(phi), -math.sin(phi)], [math.sin(phi), math.cos(phi)]]
 
-    def rotate(self, phi: float):
+    def rotate(self, phi: float) -> "P2":
         """
         矢量自身旋转
         """
@@ -365,7 +116,7 @@ class P2:
         a = float(math.atan2(self.y, self.x))
         return a if a >= 0 else math.pi * 2 + a
 
-    def __mul__(self, other):
+    def __mul__(self, other: Union[float, int, "P2"]) -> Union[float, "P2"]:
         """
         矢量乘标量，各元素相乘，返回新矢量
         矢量乘矢量，内积，返回标量
@@ -375,19 +126,19 @@ class P2:
         else:
             return self.x * other.x + self.y * other.y
 
-    def __rmul__(self, other):
+    def __rmul__(self, other: Union[float, int]) -> "P2":
         """
         当左操作数不支持相应的操作时被调用
         """
         return self.__mul__(other)
 
-    def __truediv__(self, number: Union[int, float]):
+    def __truediv__(self, number: Union[int, float]) -> "P2":
         if isinstance(number, int) or isinstance(number, float):
             return self * (1 / number)
         else:
             raise ValueError("P2仅支持数字除法")
 
-    def angle_to(self, other) -> float:
+    def angle_to(self, other: "P2") -> float:
         """
         矢量 self 到 另一个矢量 other 的夹角
         """
@@ -399,14 +150,16 @@ class P2:
         # theta = (self * other) / (self.length() * other.length())
         # return math.acos(theta)
 
-    def to_p3(self, transformation: Callable = lambda p2: P3(p2.x, p2.y, 0.0)):
+    def to_p3(
+        self, transformation: Callable[["P2"], "P3"] = lambda p2: P3(p2.x, p2.y, 0.0)
+    ) -> "P3":
         """
         二维矢量转为三维
         默认情况返回 [x,y,0]
         """
         return transformation(self)
 
-    def __str__(self):
+    def __str__(self) -> str:
         """
         用于打印矢量值
         """
@@ -418,7 +171,7 @@ class P2:
         """
         return self.__str__()
 
-    def __eq__(self, other, err=1e-6, msg=None):
+    def __eq__(self, other: "P2", err: float = 1e-6, msg: Optional[str] = None) -> bool:
         """
         矢量相等判断
         """
@@ -427,26 +180,26 @@ class P2:
         )
 
     @staticmethod
-    def x_direct(x: float = 1.0):
+    def x_direct(x: float = 1.0) -> "P2":
         return P2(x=x)
 
     @staticmethod
-    def y_direct(y: float = 1.0):
+    def y_direct(y: float = 1.0) -> "P2":
         return P2(y=y)
 
     @staticmethod
-    def origin():
+    def origin() -> "P2":
         return P2()
 
     @staticmethod
-    def zeros():
+    def zeros() -> "P2":
         return P2()
 
     def to_list(self) -> List[float]:
         return [self.x, self.y]
 
     @staticmethod
-    def from_numpy_ndarry(ndarray: numpy.ndarray):
+    def from_numpy_ndarry(ndarray: numpy.ndarray) -> Union["P2", List["P2"]]:
         if ndarray.shape == (2,) or ndarray.shape == (2, 1):
             return P2(ndarray[0], ndarray[1])
         elif len(ndarray.shape) == 2 and ndarray.shape[1] == 2:
@@ -471,43 +224,43 @@ class P3:
         """
         return math.sqrt(self.x ** 2 + self.y ** 2 + self.z ** 2)
 
-    def normalize(self):
+    def normalize(self) -> "P3":
         """
         正则化，返回新矢量
         """
         return self * (1 / self.length())
 
-    def change_length(self, new_length: float):
+    def change_length(self, new_length: float) -> "P3":
         """
         改变长度，返回新矢量
         """
         return self.normalize() * new_length
 
-    def copy(self):
+    def copy(self) -> "P3":
         """
         拷贝
         """
         return P3(self.x, self.y, self.z)
 
-    def __add__(self, other):
+    def __add__(self, other) -> "P3":
         """
         矢量相加
         """
         return P3(self.x + other.x, self.y + other.y, self.z + other.z)
 
-    def __neg__(self):
+    def __neg__(self) -> "P3":
         """
         相反矢量
         """
         return P3(-self.x, -self.y, -self.z)
 
-    def __sub__(self, other):
+    def __sub__(self, other) -> "P3":
         """
         矢量相减
         """
         return self.__add__(other.__neg__())
 
-    def __iadd__(self, other):
+    def __iadd__(self, other) -> "P3":
         """
         矢量原地相加
         """
@@ -516,7 +269,7 @@ class P3:
         self.z += other.z
         return self
 
-    def __isub__(self, other):
+    def __isub__(self, other) -> "P3":
         """
         矢量原地减法
         """
@@ -525,7 +278,7 @@ class P3:
         self.z -= other.z
         return self
 
-    def __mul__(self, other):
+    def __mul__(self, other: Union[float, int, "P3"]) -> Union[float, "P3"]:
         """
         矢量乘标量，各元素相乘，返回新矢量
         矢量乘矢量，内积，返回标量
@@ -535,19 +288,19 @@ class P3:
         else:
             return self.x * other.x + self.y * other.y + self.z * other.z
 
-    def __rmul__(self, other):
+    def __rmul__(self, other: Union[float, int]) -> "P3":
         """
         当左操作数不支持相应的操作时被调用
         """
         return self.__mul__(other)
 
-    def __truediv__(self, number: Union[int, float]):
+    def __truediv__(self, number: Union[int, float]) -> "P3":
         if isinstance(number, int) or isinstance(number, float):
             return self * (1 / number)
         else:
             raise ValueError("P2仅支持数字除法")
 
-    def __matmul__(self, other):
+    def __matmul__(self, other: "P3") -> "P3":
         """
         矢量叉乘 / 外积，返回新矢量
         """
@@ -566,7 +319,7 @@ class P3:
     def __repr__(self) -> str:
         return self.__str__()
 
-    def __eq__(self, other, err=1e-6, msg=None) -> bool:
+    def __eq__(self, other: "P3", err: float = 1e-6, msg: Optional[str] = None) -> bool:
         """
         矢量相等判断
         """
@@ -577,30 +330,30 @@ class P3:
         )
 
     @staticmethod
-    def x_direct(x: float = 1.0):
+    def x_direct(x: float = 1.0) -> "P3":
         return P3(x=x)
 
     @staticmethod
-    def y_direct(y: float = 1.0):
+    def y_direct(y: float = 1.0) -> "P3":
         return P3(y=y)
 
     @staticmethod
-    def z_direct(z: float = 1.0):
+    def z_direct(z: float = 1.0) -> "P3":
         return P3(z=z)
 
     @staticmethod
-    def origin():
+    def origin() -> "P3":
         return P3()
 
     @staticmethod
-    def zeros():
+    def zeros() -> "P3":
         return P3()
 
     def to_list(self) -> List[float]:
         return [self.x, self.y, self.z]
 
     @staticmethod
-    def from_numpy_ndarry(ndarray: numpy.ndarray):
+    def from_numpy_ndarry(ndarray: numpy.ndarray) -> Union["P3", List["P3"]]:
         if ndarray.shape == (3,) or ndarray.shape == (3, 1):
             return P3(ndarray[0], ndarray[1], ndarray[2])
         elif len(ndarray.shape) == 2 and ndarray.shape[1] == 3:
@@ -614,7 +367,9 @@ class P3:
     def to_numpy_ndarry3_float32(self) -> numpy.ndarray:
         return numpy.array(self.to_list(), dtype=numpy.float32)
 
-    def to_p2(p, transformation: Callable = lambda p3: P2(p3.x, p3.y)) -> P2:
+    def to_p2(
+        p, transformation: Callable[["P3"], P2] = lambda p3: P2(p3.x, p3.y)
+    ) -> P2:
         return transformation(p)
 
 
@@ -726,7 +481,9 @@ class LocalCoordinateSystem:
         return self.__str__()
 
     @staticmethod
-    def create_by_y_and_z_direction(location: P3, y_direction: P3, z_direction: P3):
+    def create_by_y_and_z_direction(
+        location: P3, y_direction: P3, z_direction: P3
+    ) -> "LocalCoordinateSystem":
         """
         由 原点 location y方向 y_direction 和 z方向 z_direction 创建坐标系
         Parameters
@@ -751,7 +508,7 @@ class LocalCoordinateSystem:
         )
 
     @staticmethod
-    def global_coordinate_system():
+    def global_coordinate_system() -> "LocalCoordinateSystem":
         """
         获取全局坐标系
         Returns 全局坐标系
@@ -865,20 +622,20 @@ class Line2:
         return self.right_hand_side_point(s, -d)
 
     # ------------------------------端点性质-------------------- #
-    def point_at_start(self):
+    def point_at_start(self) -> P2:
         return self.point_at(0.0)
 
-    def point_at_end(self):
+    def point_at_end(self) -> P2:
         return self.point_at(self.get_length())
 
-    def direct_at_start(self):
+    def direct_at_start(self) -> P2:
         return self.direct_at(0.0)
 
-    def direct_at_end(self):
+    def direct_at_end(self) -> P2:
         return self.direct_at(self.get_length())
 
     # ------------------------------平移-------------------- #
-    def __add__(self, v2: P2):
+    def __add__(self, v2: P2) -> "Line2":
         """
         Line2 的平移， v2 表示移动的方向和距离
         Parameters
@@ -967,7 +724,7 @@ class Line2:
             for vp2 in self.disperse2d_with_distance(step=step)
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Line2，起点{self.point_at_start()}，长度{self.get_length()}"
 
 
@@ -990,7 +747,7 @@ class StraightLine2(Line2):
     def direct_at(self, s: float) -> P2:
         return self.direct
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"直线段，起点{self.start_point}，方向{self.direct}，长度{self.length}"
 
     def position_of(self, p: P2) -> int:
@@ -1097,7 +854,7 @@ class ArcLine2(Line2):
         radius: float,
         clockwise: bool,
         total_deg: float,
-    ):
+    ) -> "ArcLine2":
         center: P2 = start_point + start_direct.copy().rotate(
             -math.pi / 2 if clockwise else math.pi / 2
         ).change_length(radius)
@@ -1126,7 +883,7 @@ class ArcLine2(Line2):
 
         return P2(x, y)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return (
             f"弧线段，起点{self.point_at_start()}，"
             + f"方向{self.direct_at_start()}，顺时针{self.clockwise}，半径{self.radius}，角度{self.total_phi}"
@@ -1138,20 +895,20 @@ class Trajectory(Line2):
     二维设计轨迹，由直线+圆弧组成
     """
 
-    def __init__(self, first_line2: Line2):
+    def __init__(self, first_line: Line2):
         """
-        构造器，传入第一条线 first_line2
+        构造器，传入第一条线 first_line
         Parameters
         ----------
-        first_line2 第一条线
+        first_line 第一条线
         -------
 
         """
-        self.__trajectoryList = [first_line2]
-        self.__length = first_line2.get_length()
+        self.__trajectoryList = [first_line]
+        self.__length = first_line.get_length()
         self.__point_at_error_happen = False  # 是否发生 point_at 错误
 
-    def add_strait_line(self, length: float):
+    def add_strait_line(self, length: float) -> "Trajectory":
         """
         尾接直线
         Parameters
@@ -1173,7 +930,9 @@ class Trajectory(Line2):
 
         return self
 
-    def add_arc_line(self, radius: float, clockwise: bool, angle_deg: float):
+    def add_arc_line(
+        self, radius: float, clockwise: bool, angle_deg: float
+    ) -> "Trajectory":
         """
         尾接圆弧
         Parameters
@@ -1246,20 +1005,20 @@ class Trajectory(Line2):
 
         return last_line.direct_at(s)
 
-    def __str__(self):
+    def __str__(self) -> str:
         details = "\t\n".join(self.__trajectoryList.__str__())
         return f"Trajectory:{details}"
 
+    class TrajectoryBuilder:
+        def __init__(self, start_point: P2):
+            self.start_point = start_point
+
+        def first_line(self, direct: P2, length: float) -> "Trajectory":
+            return Trajectory(StraightLine2(length, direct, self.start_point))
+
     @staticmethod
-    def set_start_point(start_point: P2):
-        class TrajectoryBuilder:
-            def __init__(self, start_point: P2):
-                self.start_point = start_point
-
-            def first_line2(self, direct: P2, length: float):
-                return Trajectory(StraightLine2(length, direct, self.start_point))
-
-        return TrajectoryBuilder(start_point)
+    def set_start_point(start_point: P2) -> "Trajectory.TrajectoryBuilder":
+        return Trajectory.TrajectoryBuilder(start_point)
 
     @classmethod
     def __cctpy__(cls) -> List[Line2]:
@@ -1272,7 +1031,7 @@ class Trajectory(Line2):
         c_r = 100
         C1 = (
             Trajectory.set_start_point(start_point=P2(176, 88))
-            .first_line2(
+            .first_line(
                 direct=P2.x_direct().rotate(
                     BaseUtils.angle_to_radian(360 - c_angle) / 2
                 ),
@@ -1292,7 +1051,7 @@ class Trajectory(Line2):
 
         T = (
             Trajectory.set_start_point(start_point=P2(430, 155))
-            .first_line2(direct=P2.x_direct(), length=t_width)
+            .first_line(direct=P2.x_direct(), length=t_width)
             .add_arc_line(radius=r, clockwise=True, angle_deg=90)
             .add_strait_line(length=width)
             .add_arc_line(radius=r, clockwise=True, angle_deg=90)
@@ -1315,7 +1074,7 @@ class Trajectory(Line2):
 
         P_out = (
             Trajectory.set_start_point(start_point=P2(655, 155))
-            .first_line2(direct=P2.x_direct(), length=2 * width)
+            .first_line(direct=P2.x_direct(), length=2 * width)
             .add_arc_line(radius=p_r, clockwise=True, angle_deg=180)
             .add_strait_line(length=width)
             .add_arc_line(radius=r, clockwise=False, angle_deg=90)
@@ -1330,7 +1089,7 @@ class Trajectory(Line2):
             Trajectory.set_start_point(
                 start_point=P_out.point_at(width) - P2(0, width * 0.6)
             )
-            .first_line2(direct=P2.x_direct(), length=width)
+            .first_line(direct=P2.x_direct(), length=width)
             .add_arc_line(radius=p_r - width * 0.6, clockwise=True, angle_deg=180)
             .add_strait_line(length=width)
             .add_arc_line(radius=r, clockwise=True, angle_deg=90)
@@ -1344,7 +1103,7 @@ class Trajectory(Line2):
 
         Y = (
             Trajectory.set_start_point(start_point=P2(810, 155))
-            .first_line2(direct=P2.x_direct(), length=width)
+            .first_line(direct=P2.x_direct(), length=width)
             .add_arc_line(radius=r, clockwise=True, angle_deg=60)
             .add_strait_line(length=y_tilt_len)
             .add_arc_line(radius=r, clockwise=False, angle_deg=120)
@@ -1531,6 +1290,7 @@ class Magnet:
         class NoMagnet(Magnet):
             def magnetic_field_at(self, point: P3) -> P3:
                 return P3.zeros()
+
         return NoMagnet()
 
 
@@ -1860,7 +1620,7 @@ class RunningParticle:
         # 运动距离
         self.distance += footstep
 
-    def copy(self):
+    def copy(self)->'RunningParticle':
         """
         深拷贝粒子
         Returns 深拷贝粒子
@@ -2077,7 +1837,7 @@ class PhaseSpaceParticle:
     @staticmethod
     def phase_space_particles_along_positive_ellipse_in_xxp_plane(
         xMax: float, xpMax: float, delta: float, number: int
-    ) -> List:
+    ) -> List['PhaseSpaceParticle']:
         """
         获取分布于 x xp 平面上 正相椭圆上的 PhaseSpaceParticles
         注意是 正相椭圆
@@ -2107,7 +1867,7 @@ class PhaseSpaceParticle:
     @staticmethod
     def phase_space_particles_along_positive_ellipse_in_yyp_plane(
         yMax: float, ypMax: float, delta: float, number: int
-    ) -> List:
+    ) -> List['PhaseSpaceParticle']:
         """
         获取分布于 y yp 平面上 正相椭圆上的 PhaseSpaceParticles
         注意是 正相椭圆
@@ -2137,7 +1897,7 @@ class PhaseSpaceParticle:
     @staticmethod
     def phase_space_particles_along_positive_ellipse_in_plane(
         plane_id: int, xMax: float, xpMax: float, delta: float, number: int
-    ) -> List:
+    ) -> List['PhaseSpaceParticle']:
         """
         获取分布于 x xp 平面上或 y yp 平面上的，正相椭圆上的 PhaseSpaceParticles
         Parameters
@@ -2226,7 +1986,7 @@ class PhaseSpaceParticle:
         ideal_particle: RunningParticle,
         coordinate_system: LocalCoordinateSystem,
         running_particle: RunningParticle,
-    ):
+    )->'PhaseSpaceParticle':
         # x y z
         relative_position = running_particle.position - ideal_particle.position
         x = coordinate_system.XI * relative_position
@@ -2250,7 +2010,7 @@ class PhaseSpaceParticle:
         ideal_particle: RunningParticle,
         coordinate_system: LocalCoordinateSystem,
         running_particles: List[RunningParticle],
-    ) -> List:
+    ) -> List['PhaseSpaceParticle']:
         return [
             PhaseSpaceParticle.create_from_running_particle(
                 ideal_particle, coordinate_system, rp
@@ -2261,7 +2021,7 @@ class PhaseSpaceParticle:
     @staticmethod
     def convert_delta_from_momentum_dispersion_to_energy_dispersion(
         phaseSpaceParticle, centerKineticEnergy_MeV
-    ):
+    )->'PhaseSpaceParticle':
         """
         动量分散改动能分散
         Parameters
@@ -2288,7 +2048,7 @@ class PhaseSpaceParticle:
     @staticmethod
     def convert_delta_from_momentum_dispersion_to_energy_dispersion_for_list(
         phaseSpaceParticles: List, centerKineticEnergy_MeV
-    ):
+    )->List['PhaseSpaceParticle']:
         """
         动量分散改动能分散，见上方法 convert_delta_from_momentum_dispersion_to_energy_dispersion
         Parameters
@@ -2310,7 +2070,7 @@ class PhaseSpaceParticle:
     @staticmethod
     def convert_delta_from_energy_dispersion_to_energy_dispersion_momentum_dispersion(
         phaseSpaceParticle, centerKineticEnergy_MeV: float
-    ):
+    )->'PhaseSpaceParticle':
         copied = phaseSpaceParticle.copy()
 
         EnergyDispersion = copied.getDelta()
@@ -2326,7 +2086,7 @@ class PhaseSpaceParticle:
     @staticmethod
     def convert_delta_from_energy_dispersion_to_energy_dispersion_momentum_dispersion_for_list(
         phaseSpaceParticles: List, centerKineticEnergy_MeV: float
-    ):
+    )->List['PhaseSpaceParticle']:
         return [
             PhaseSpaceParticle.convert_delta_from_energy_dispersion_to_energy_dispersion_momentum_dispersion(
                 pp, centerKineticEnergy_MeV
@@ -2339,7 +2099,7 @@ class PhaseSpaceParticle:
             f"x={self.x},xp={self.xp},y={self.y},yp={self.yp},z={self.z},d={self.delta}"
         )
 
-    def copy(self):
+    def copy(self)->'PhaseSpaceParticle':
         return PhaseSpaceParticle(self.x, self.xp, self.y, self.yp, self.z, self.delta)
 
 
@@ -2396,7 +2156,7 @@ class ParticleFactory:
     @staticmethod
     def create_proton_along(
         trajectory: Line2, s: float = 0.0, kinetic_MeV: float = 250
-    ):
+    )->RunningParticle:
         return ParticleFactory.create_proton(
             trajectory.point_at(s).to_p3(),
             trajectory.direct_at(s).to_p3(),
@@ -2653,7 +2413,8 @@ class CCT(Magnet, ApertureObject):
         return (
             f"CCT: local_coordinate_system({self.local_coordinate_system})big_r({self.big_r})small_r({self.small_r})"
             + f"bending_angle({self.bending_angle})tilt_angles({self.tilt_angles})winding_number({self.winding_number})"
-            + f"current({self.current})start_ksi({self.start_ksi})start_phi({self.start_phi})clockwise({self.clockwise})"
+            + f"current({self.current})starting_point_in_ksi_phi_coordinate({self.starting_point_in_ksi_phi_coordinate})"
+            + f"end_point_in_ksi_phi_coordinate({self.end_point_in_ksi_phi_coordinate})"
             + f"disperse_number_per_winding({self.disperse_number_per_winding})"
         )
 
@@ -2681,7 +2442,7 @@ class CCT(Magnet, ApertureObject):
         end_point_in_ksi_phi_coordinate: P2,
         # 每匝线圈离散电流元数目，数字越大计算精度越高
         disperse_number_per_winding: int = 120,
-    ):
+    )->'CCT':
         """
         按照设计轨迹 trajectory 上 s 位置处创建 CCT
         """
@@ -2809,7 +2570,7 @@ class QS(Magnet, ApertureObject):
         gradient: float,
         second_gradient: float,
         aperture_radius: float,
-    ):
+    )->'QS':
         """
         按照设计轨迹 trajectory 的 s 处创建 QS 磁铁
         """
@@ -2842,9 +2603,257 @@ class Beamline(Magnet):
             b += m.magnetic_field_at(point)
         return b
 
-    def add(self, m: Magnet):
+    def add(self, m: Magnet)->'Beamline':
         self.magnets.append(m)
         return self
+
+
+class BaseUtils:
+    """
+    这里存放一些简单的工具，如
+    1. 判断两个对象是否相等
+    2. numpy 中用于生成均匀分布的 linspace 方法
+    3. 角度转弧度 angle_to_radian 和 弧度转角度 radian_to_angle
+    4. 打印函数调用栈 print_traceback （这个主要用于 debug）
+    5. 椭圆。用于生成椭圆圆周上均匀分布的若干点
+    """
+
+    @staticmethod
+    def equal(
+        a: Union[float, int, P2, P3],
+        b: Union[float, int, P2, P3],
+        err: float = 1e-6,
+        msg: Optional[str] = None,
+    ) -> bool:
+        """
+        判断 a b 是否相等，相等返回 true
+        当 a b 不相等时，若 msg 为空，返回 flase，否则抛出异常，异常信息即 msg
+
+        示例：
+        """
+        if (isinstance(a, float) or isinstance(a, int)) and (
+            isinstance(b, float) or isinstance(b, int)
+        ):
+            if (
+                a == b
+                or abs(a - b) <= err
+                or ((a + b != 0.0) and ((2 * abs((a - b) / (a + b))) <= err))
+            ):
+                return True
+            else:
+                if msg is None:
+                    return False
+                else:
+                    raise AssertionError(msg)
+        elif (isinstance(a, P2) and isinstance(b, P2)) or (
+            isinstance(a, P3) and isinstance(b, P3)
+        ):
+            if a.__eq__(b, err=err, msg=msg):
+                return True
+            else:
+                if msg is None:
+                    return False
+                else:
+                    raise AssertionError(msg)
+        else:
+            if a == b:
+                return True
+            else:
+                if msg is None:
+                    return False
+                else:
+                    raise AssertionError(msg)
+
+    @staticmethod
+    def linspace(
+        start: Union[float, int, P2, P3], end: Union[float, int, P2, P3], number: int
+    ) -> List[Union[float, P2, P3]]:
+        """
+        同 numpy 的 linspace
+        """
+        # 除法改成乘法以适应 P2 P3 对象
+        d = (end - start) * (1 / (number - 1))
+        # i 转为浮点以适应 P2 P3 对象
+        return [start + d * float(i) for i in range(number)]
+
+    @staticmethod
+    def angle_to_radian(
+        deg: Union[float, int, List[Union[float, int]]]
+    ) -> Union[float, List[float]]:
+        if isinstance(deg, float) or isinstance(deg, int):
+            return deg / 180.0 * math.pi
+        elif isinstance(deg, List):
+            return [BaseUtils.angle_to_radian(d) for d in deg]
+        else:
+            raise NotImplementedError
+
+    @staticmethod
+    def radian_to_angle(
+        rad: Union[float, int, List[Union[float, int]]]
+    ) -> Union[float, List[float]]:
+        if isinstance(rad, float) or isinstance(rad, int):
+            return rad * 180.0 / math.pi
+        elif isinstance(rad, List):
+            return [BaseUtils.radian_to_angle(d) for d in rad]
+        else:
+            raise NotImplementedError
+
+    @staticmethod
+    def circle_center_and_radius(p1: P2, p2: P2, p3: P2) -> Tuple[P2, float]:
+        """
+        已知三个二维点 p1 p2 p3
+        求由这三个点组成的圆的圆心和半径
+        方法来自：https://blog.csdn.net/liutaojia/article/details/83625151
+        """
+        x1 = p1.x
+        x2 = p2.x
+        x3 = p3.x
+        y1 = p1.y
+        y2 = p2.y
+        y3 = p3.y
+        z1 = x2 ** 2 + y2 ** 2 - x1 ** 2 - y1 ** 2
+        z2 = x3 ** 2 + y3 ** 2 - x1 ** 2 - y1 ** 2
+        z3 = x3 ** 2 + y3 ** 2 - x2 ** 2 - y2 ** 2
+        A = numpy.array(
+            [[(x2 - x1), (y2 - y1)], [(x3 - x1), (y3 - y1)], [(x3 - x2), (y3 - y2)]]
+        )
+        B = 0.5 * numpy.array([[z1], [z2], [z3]])
+        c = numpy.linalg.inv(A.T @ A) @ A.T @ B
+        c = P2.from_numpy_ndarry(c)
+        # c = (A'*A)\A'*B;
+        R1 = math.sqrt((c.x - x1) ** 2 + (c.y - y1) ** 2)
+        R2 = math.sqrt((c.x - x2) ** 2 + (c.y - y2) ** 2)
+        R3 = math.sqrt((c.x - x3) ** 2 + (c.y - y3) ** 2)
+        R = (R1 + R2 + R3) / 3
+        return (c, R)
+
+    @staticmethod
+    def polynomial_fitting(xs: List[float], ys: List[float], order: int) -> List[float]:
+        """
+        多项式拟合
+        xs 自变量，ys 变量，拟合阶数为 order，返回一个数组
+        数组第 0 项为拟合常数项
+        数组第 i 项为拟合 i 次项
+        """
+        fit = numpy.polyfit(xs, ys, order)
+        return fit[::-1].tolist()
+
+    @staticmethod
+    def print_traceback() -> None:
+        """
+        打印函数调用栈
+        Returns
+        -------
+
+        """
+        f = sys._getframe()
+        while f is not None:
+            print(f)
+            f = f.f_back
+
+    class Ellipse:
+        """
+        椭圆类
+        Ax^2+Bxy+Cy^2=D
+        """
+
+        def __init__(self, A: float, B: float, C: float, D: float):
+            self.A = float(A)
+            self.B = float(B)
+            self.C = float(C)
+            self.D = float(D)
+
+        def point_at(self, theta: float) -> P2:
+            """
+            原点出发，方向th弧度的射线和椭圆Ax^2+Bxy+Cy^2=D的交点
+            Parameters
+            ----------
+            theta 弧度
+
+            Returns 方向th弧度的射线和椭圆Ax^2+Bxy+Cy^2=D的交点
+            -------
+
+            """
+            d = P2()
+
+            while theta < 0:
+                theta += 2 * math.pi
+
+            while theta > 2 * math.pi:
+                theta -= 2 * math.pi
+
+            if BaseUtils.equal(theta, 0) or BaseUtils.equal(theta, 2 * math.pi):
+                d.x = math.sqrt(self.D / self.A)
+                d.y = 0
+
+            if BaseUtils.equal(theta, math.pi):
+                d.x = -math.sqrt(self.D / self.A)
+                d.y = 0
+
+            t = 0.0
+
+            if 0 < theta < math.pi:
+                t = 1 / math.tan(theta)
+                d.y = math.sqrt(self.D / (self.A * t * t + self.B * t + self.C))
+                d.x = t * d.y
+
+            if math.pi < theta < 2 * math.pi:
+                theta -= math.pi
+                t = 1 / math.tan(theta)
+                d.y = -math.sqrt(self.D / (self.A * t * t + self.B * t + self.C))
+                d.x = t * d.y
+
+            return d
+
+        @property
+        def circumference(self) -> float:
+            """
+            计算椭圆周长
+            Returns 计算椭圆周长
+            -------
+
+            """
+            num: int = 3600 * 4
+            c: float = 0.0
+            for i in range(num):
+                c += (
+                    self.point_at(2.0 * math.pi / float(num) * (i + 1))
+                    - self.point_at(2.0 * math.pi / float(num) * (i))
+                ).length()
+
+            return c
+
+        def point_after(self, length: float) -> P2:
+            """
+            在椭圆 Ax^2+Bxy+Cy^2=D 上行走 length，返回此时的点
+            规定起点：椭圆与X轴正方向的交点
+            规定行走方向：逆时针
+            Parameters
+            ----------
+            length 行走距离
+
+            Returns 椭圆 Ax^2+Bxy+Cy^2=D 上行走 length，返回此时的点
+            -------
+
+            """
+            step_theta = BaseUtils.angle_to_radian(0.05)
+            theta = 0.0
+            while length > 0.0:
+                length -= (
+                    self.point_at(theta + step_theta) - self.point_at(theta)
+                ).length()
+
+                theta += step_theta
+
+            return self.point_at(theta)
+
+        def uniform_distribution_points_along_edge(self, num: int) -> List[P2]:
+            points = []
+            c = self.circumference
+            for i in range(num):
+                points.append(self.point_after(c / num * i))
+
+            return points
 
 
 class Plot3:
@@ -3016,6 +3025,14 @@ class Plot3:
     def __logo__():
         LOGO = Trajectory.__cctpy__()
         Plot3.plot_line2s(LOGO, [1 * M], ["r-", "r-", "r-", "b-", "b-"])
+        Plot3.plot_local_coordinate_system(
+            LocalCoordinateSystem(location=P3(z=-0.5e-6)),
+            axis_lengths=[1000, 200, 1e-6],
+            describe="k-",
+        )
+        Plot3.off_axis()
+        Plot3.remove_background_color()
+        Plot3.ax.view_init(elev=20, azim=-79)
         Plot3.show()
 
 
@@ -3042,13 +3059,15 @@ class Plot2:
             Plot2.__init()
 
         plt.plot(p.x, p.y, describe)
-    
+
     @staticmethod
-    def plot_p3(p: P3, describe="r") -> None:
+    def plot_p3(
+        p: P3, p3_to_p2: Callable = lambda p3: P2(p3.x, p3.y), describe="r"
+    ) -> None:
         if not Plot2.INIT:
             Plot2.__init()
 
-        plt.plot(p.x, p.y, describe)
+        Plot2.plot_p2(p3_to_p2(p), describe)
 
     @staticmethod
     def plot_p2s(ps: List[P2], describe="r-") -> None:
@@ -3056,13 +3075,15 @@ class Plot2:
             Plot2.__init()
 
         plt.plot([p.x for p in ps], [p.y for p in ps], describe)
-    
+
     @staticmethod
-    def plot_p3s(ps: List[P3], describe="r-") -> None:
+    def plot_p3s(
+        ps: List[P3], p3_to_p2: Callable = lambda p3: P2(p3.x, p3.y), describe="r-"
+    ) -> None:
         if not Plot2.INIT:
             Plot2.__init()
 
-        plt.plot([p.x for p in ps], [p.y for p in ps], describe)
+        Plot2.plot_p2s([p3_to_p2(p) for p in ps], describe)
 
     @staticmethod
     def plot_ndarry2ds(narray: numpy.ndarray, describe="r-") -> None:
@@ -3167,170 +3188,6 @@ class Plot2:
         plt.show()
 
 
-class GPU_ACCELERETE:
-    COMPILED: bool = False  # 是否完成编译
-    CUDA_MAGNETIC_FIELD_AT_CCT: Callable = None
-
-    @staticmethod
-    def __compile():
-        if GPU_ACCELERETE.COMPILED:
-            return  # 如果已经编译完毕，直接返回
-
-        CUDA_GENERAL_CODE = """
-
-#include <stdio.h>
-#include <math.h>
-#include "cuda.h"
-
-#define MM (0.001f)
-#define DIM (3)
-#define PI (3.1415927f)
-#define X (0)
-#define Y (1)
-#define Z (2)
-
-
-__device__ __forceinline__ void vct_cross(float *a, float *b, float *ret) {
-    ret[X] = a[Y] * b[Z] - a[Z] * b[Y];
-    ret[Y] = -a[X] * b[Z] + a[Z] * b[X];
-    ret[Z] = a[X] * b[Y] - a[Y] * b[X];
-}
-
-__device__ __forceinline__ void vct_add_local(float *a_local, float *b) {
-    a_local[X] += b[X];
-    a_local[Y] += b[Y];
-    a_local[Z] += b[Z];
-}
-
-__device__ __forceinline__ void vct_add(float *a, float *b, float *ret) {
-    ret[X] = a[X] + b[X];
-    ret[Y] = a[Y] + b[Y];
-    ret[Z] = a[Z] + b[Z];
-}
-
-__device__ __forceinline__ void vct_dot_a_v(float a, float *v) {
-    v[X] *= a;
-    v[Y] *= a;
-    v[Z] *= a;
-}
-
-__device__ __forceinline__ void vct_dot_a_v_ret(float a, float *v, float *ret) {
-    ret[X] = v[X] * a;
-    ret[Y] = v[Y] * a;
-    ret[Z] = v[Z] * a;
-}
-
-__device__ __forceinline__ void vct_copy(float *src, float *des) {
-    des[X] = src[X];
-    des[Y] = src[Y];
-    des[Z] = src[Z];
-}
-
-__device__ __forceinline__ float vct_len(float *v) {
-    return sqrtf(v[X] * v[X] + v[Y] * v[Y] + v[Z] * v[Z]);
-}
-
-__device__ __forceinline__ void vct_zero(float *v) {
-    v[X] = 0.0f;
-    v[Y] = 0.0f;
-    v[Z] = 0.0f;
-}
-
-__device__ __forceinline__ void vct_sub(float *a, float *b, float *ret) {
-    ret[X] = a[X] - b[X];
-    ret[Y] = a[Y] - b[Y];
-    ret[Z] = a[Z] - b[Z];
-}
-
-// 磁场计算 注意，这里计算的不是电流元的磁场，还需要乘以 电流 和 μ0/4π (=1e-7)
-// p0 和 p1 构成电流元左右端点，计算电流元在 p 点产生的磁场，返回值写入 ret 中
-__device__ void dB(float *p0, float *p1, float *p, float *ret) {
-    float p01[DIM];
-    float r[DIM];
-    float rr;
-
-    vct_sub(p1, p0, p01); // p01 = p1 - p0
-
-    vct_add(p0, p1, r); // r = p0 + p1
-
-    vct_dot_a_v(0.5f, r); // r = (p0 + p1)/2
-
-    vct_sub(p, r, r); // r = p - r
-
-    rr = vct_len(r); // rr = len(r)
-
-    vct_cross(p01, r, ret); // ret = p01 x r
-
-    rr = 1.0f / rr / rr / rr; // changed
-
-    vct_dot_a_v(rr, ret); // rr . (p01 x r)
-}
-
-    """
-
-        CUDA_MAGNET_SOLO_CCT = """
-
-// 计算单个 CCT 产生的磁场，winding 表示 CCT 路径离散点
-// 因为 CUDA 只支持一维数组，winding[0]、winding[1]、winding[2]，表示第一个点
-// winding[3]、winding[4]、winding[5] 表示第二个点
-// length 表示点的数目
-// 计算 CCT 在 p 点产生的磁场，返回值存入 ret 中
-// 注意实际磁场还要乘上电流和 μ0/4π (=1e-7)
-__global__ void magnet_solo_cct(float *winding, float *p, int *length, float *ret) {
-    int tid = threadIdx.x + blockIdx.x * blockDim.x;
-
-    if (tid == 0){
-        vct_zero(ret);
-        printf("\\%f,\\%f,\\%f\\n",p[0],p[1],p[2]);
-    }
-
-    __syncthreads();
-
-    if (tid < *length - 1) {
-        float *p0 = winding + tid * DIM;
-        float *p1 = winding + (tid + 1) * DIM;
-        float db[3];
-
-        dB(p0, p1, p, db);
-
-        atomicAdd(&ret[X], db[X]);
-        atomicAdd(&ret[Y], db[Y]);
-        atomicAdd(&ret[Z], db[Z]);
-    }
-}
-
-    """
-        GPU_ACCELERETE.CUDA_MAGNETIC_FIELD_AT_CCT = SourceModule(
-            CUDA_GENERAL_CODE + CUDA_MAGNET_SOLO_CCT
-        ).get_function("magnet_solo_cct")
-
-    @staticmethod
-    def magnetic_field_at(magnet: Magnet, point: P3) -> P3:
-        """
-        magnet 在 point 处产生的磁场
-        这个方法需要反复传输数据，速度比 CPU 慢
-        """
-        GPU_ACCELERETE.__compile()
-        if isinstance(magnet, CCT):
-            # point 转为局部坐标，并变成 numpy 向量
-            p = magnet.local_coordinate_system.point_to_local_coordinate(
-                point
-            ).to_numpy_ndarry3_float32()
-            length = int(magnet.dispersed_path3.shape[0])
-            winding = magnet.dispersed_path3.flatten().astype(numpy.float32)
-            ret = numpy.zeros((3,), dtype=numpy.float32)
-            GPU_ACCELERETE.CUDA_MAGNETIC_FIELD_AT_CCT(
-                drv.In(winding),
-                drv.In(p),
-                drv.In(numpy.array([length]).astype(numpy.int32)),
-                drv.Out(ret),
-                block=(512, 1, 1),
-                grid=(256, 1),
-            )
-            print(p)
-            return P3.from_numpy_ndarry(ret * magnet.current * 1e-7)
-
-
 if __name__ == "__main__":
     DL2 = 2.1162209
     GAP3 = 0.1978111
@@ -3368,7 +3225,7 @@ if __name__ == "__main__":
 
     trajectory_part2 = (
         Trajectory.set_start_point(P2(3.703795764767297, 1.5341624380266456))
-        .first_line2(P2(1, 1), DL2)
+        .first_line(P2(1, 1), DL2)
         .add_arc_line(0.95, True, dipole_cct_bending_angle)
     )
 
