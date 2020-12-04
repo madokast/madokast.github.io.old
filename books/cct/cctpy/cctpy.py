@@ -3,7 +3,7 @@ CCT 建模优化全套解决方案
 用户手册见 
 开发手册见 cctpy_developer_manual.pdf
 """
-from typing import Callable, Generic, List, Optional, Tuple, TypeVar, Union
+from typing import Callable, Generic, List, NoReturn, Optional, Tuple, TypeVar, Union
 import matplotlib.pyplot as plt
 import math
 import sys
@@ -240,6 +240,21 @@ class P2:
             return [P2.from_numpy_ndarry(sub_array) for sub_array in ndarray]
         else:
             raise ValueError(f"无法将{ndarray}转为P2或List[P2]")
+
+    @staticmethod
+    def extract(p2_list:List['P2'])->Tuple[List[float],List[float]]:
+        """
+        分别抽取 P2 数组中的 x 坐标和 y 坐标
+        举例如下
+        p2_list = [1,2], [2,3], [5,4]
+        则返回 [1,2,5] 和 [2,3,4]
+        这个方法主要用于 matplotlib 绘图
+        """
+        return ([
+            p.x for p in p2_list
+        ],[
+            p.y for p in p2_list
+        ])
 
 
 class P3:
@@ -1399,7 +1414,43 @@ class Magnet:
         step：line2 上取点间距
         point_number：水平垂线上取点数目，越多则拟合越精确
         """
-        raise NotImplementedError
+        # 拟合阶数
+        fit_order: int = 2
+
+        # 自变量
+        xs: List[float] = BaseUtils.linspace(
+            -good_field_area_width / 2, good_field_area_width / 2, point_number
+        )
+
+        # line2 长度
+        length = line2.get_length()
+
+        # 离散距离
+        distances = BaseUtils.linspace(0, length, int(length / step))
+
+        # 返回值
+        ret: List[P2] = []
+
+        for s in distances:
+            right_hand_point: P3 = line2.right_hand_side_point(
+                s=s, d=good_field_area_width / 2
+            ).to_p3()
+            left_hand_point: P3 = line2.left_hand_side_point(
+                s=s, d=good_field_area_width / 2
+            ).to_p3()
+
+            points: List[P3] = BaseUtils.linspace(
+                right_hand_point, left_hand_point, point_number
+            )
+
+            # 磁场 bz
+            ys: List[float] = [self.magnetic_field_at(p).z for p in points]
+
+            # 拟合
+            gradient: float = BaseUtils.polynomial_fitting(xs, ys, fit_order)[2]
+
+            ret.append(P2(s, gradient))
+        return ret
 
     def multipole_field_along(
         self,
@@ -1875,7 +1926,7 @@ class ParticleRunner:
 
     @staticmethod
     def run_only(
-        p: RunningParticle, m: Magnet, length: float, footstep: float = 1 * MM
+        p: Union[RunningParticle,List[RunningParticle]], m: Magnet, length: float, footstep: float = 1 * MM
     ) -> None:
         """
         让粒子 p 在磁场 m 中运动 length 距离，步长 footstep
@@ -1890,12 +1941,20 @@ class ParticleRunner:
         -------
 
         """
-        distance = 0.0
-        while distance < length:
-            p.run_self_in_magnetic_field(
-                m.magnetic_field_at(p.position), footstep=footstep
-            )
-            distance += footstep
+        if isinstance(p,RunningParticle):
+            distance = 0.0
+            while distance < length:
+                p.run_self_in_magnetic_field(
+                    m.magnetic_field_at(p.position), footstep=footstep
+                )
+                distance += footstep
+        else:
+            particle_number = len(p)
+            print(f"track {particle_number} particles")
+            for this_p in p:
+                print('▇',end='',flush=True)
+                ParticleRunner.run_only(this_p,m,length,footstep)
+            print(' finish')
 
     @staticmethod
     def run_get_trajectory(
@@ -2944,6 +3003,48 @@ class Beamline(Line2, Magnet, ApertureObject):
         return super(Beamline,self).magnetic_field_bz_along(
             line2=line2, p2_t0_p3=p2_t0_p3, step=step
         )
+
+    def graident_field_along(
+        self,
+        line2: Optional[Line2] = None,
+        good_field_area_width: float = 10 * MM,
+        step: float = 1 * MM,
+        point_number: int = 4,
+    ) -> List[P2]:
+        """
+        计算本对象在二维曲线 line2 (line2 为 None 时，默认为 self.trajectory)上的磁场梯度的分布
+        每一点的梯度，采用这点水平垂线上 Bz 的多项式拟合得到
+        good_field_area_width：水平垂线的长度，注意应小于等于好场区范围
+        step：line2 上取点间距
+        point_number：水平垂线上取点数目，越多则拟合越精确
+        """
+        if line2 is None:
+            line2 = self.trajectory
+        
+        return super(Beamline,self).graident_field_along(
+            line2=line2, good_field_area_width=good_field_area_width,step=step,point_number=point_number
+        )
+
+    def second_graident_field_along(
+        self,
+        line2: Optional[Line2] = None,
+        good_field_area_width: float = 10 * MM,
+        step: float = 1 * MM,
+        point_number: int = 4,
+    ) -> List[P2]:
+        """
+        计算本对象在二维曲线 line2 (line2 为 None 时，默认为 self.trajectory)上的磁场二阶梯度的分布（六极场）
+        每一点的梯度，采用这点水平垂线上 Bz 的多项式拟合得到
+        good_field_area_width：水平垂线的长度，注意应小于等于好场区范围
+        step：line2 上取点间距
+        point_number：水平垂线上取点数目，越多则拟合越精确
+        """
+        if line2 is None:
+            line2 = self.trajectory
+        
+        return super(Beamline,self).second_graident_field_along(
+            line2=line2, good_field_area_width=good_field_area_width,step=step,point_number=point_number
+        )
         
 
     def track_ideal_particle(
@@ -3024,11 +3125,9 @@ class Beamline(Line2, Magnet, ApertureObject):
         )
 
         # run
-        for p in rp_x:
-            ParticleRunner.run_only(p=p, m=self, length=length, footstep=footstep)
+        ParticleRunner.run_only(p=rp_x, m=self, length=length, footstep=footstep)
 
-        for p in rp_y:
-            ParticleRunner.run_only(p=p, m=self, length=length, footstep=footstep)
+        ParticleRunner.run_only(p=rp_y, m=self, length=length, footstep=footstep)
 
         pp_x_end = PhaseSpaceParticle.create_from_running_particles(
             ideal_particle=ip_end,
@@ -4183,7 +4282,7 @@ class Plot2:
         title: str = "",
         font_size: int = 12,
         font_family: str = "Times New Roman",
-    ):
+    )->NoReturn:
         """
         设置文字标记
         """
@@ -4203,6 +4302,22 @@ class Plot2:
         plt.yticks(fontproperties=font_family, size=font_size)
 
     @staticmethod
+    def legend(*labels:Tuple,font_size:int=12,font_family:str="Times New Roman")->NoReturn:
+        """
+        设置图例
+        """
+        if not Plot2.INIT:
+            Plot2.__init()
+
+        font_label = {
+            "family": font_family,
+            "weight": "normal",
+            "size": font_size,
+        }
+
+        plt.legend(labels=list(labels),prop=font_label)
+
+    @staticmethod
     def show():
         """
         展示图象
@@ -4212,11 +4327,3 @@ class Plot2:
 
         plt.show()
 
-if __name__ == "__main__":
-    b = Beamline.set_start_point(P2()).first_drift(P2.x_direct(),1)
-
-    bz = b.magnetic_field_bz_along()
-
-    Plot2.plot(bz)
-
-    Plot2.show()

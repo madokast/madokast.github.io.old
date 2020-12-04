@@ -1,0 +1,48 @@
+Notes & Questions for CCTPY v0.1
+B. Qin
+
+---  Codes 杂项 ---
+
+1. 运行环境要求
+matplotlib raise error
+--> Solved: upgrade matplotlib
+
+2. Can't plot beamline [demo codes in user manual]
+--> Solved: 
+Add Plot2.show() @ Code END!
+
+3. 无法分别显示2张或以上plot
+--> plt.figure()
+
+4. 
+(1)Plot无axis & unit
+(2)磁场计算或束流跟踪耗时相对长，可增加简易进度条；以及时间花费统计。
+
+
+
+---  Codes 主要问题 ---
+1. 单个文件太长，找代码不方便；考虑至少分为2个文件？
+(1) basic utilities;
+(2) magnet calculation, beamline assemble, particle tracking
+
+2. 粒子跟踪
+(1) 关于RunningParticle, 未使用4阶Runge-Kutta等基本数值积分方法，即使step小，跟踪精度不够
+(2) 结果比对？
+
+3. CCT Modelling and Calculation
+(1) 使用的双极点坐标系？
+(2) CCT结果比对 （e.g.同陈鹤鸣结果比对）
+(3) CCT多极场调节、优化等
+
+3. 重要功能, 已写入框架，待实现
+e.g. Multipole fields along beam axis
+
+4. 其他功能集成，例如 
+(1) Cosy脚本中不同enengy offset多粒子跟踪生成
+SR  0.000000e+00  0.000000e+00  3.500000e-03  0.000000e+00  0  DE  0  0  1 ;
+SR  0.000000e+00  0.000000e+00  3.460906e-03  1.117842e-03  0  DE  0  0  1 ;
+SR  0.000000e+00  0.000000e+00  3.342445e-03  2.224922e-03  0  DE  0  0  1 ;
+SR  0.000000e+00  0.000000e+00  3.137554e-03  3.323676e-03  0  DE  0  0  1 ;
+SR  0.000000e+00  0.000000e+00  2.834815e-03  4.398772e-03  0  DE  0  0  1 ;
+
+5. 关于CUDA并行化实现？是在什么级别？计算每个粒子还是每套参数？
