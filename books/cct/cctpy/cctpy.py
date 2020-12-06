@@ -4837,42 +4837,7 @@ class HUST_SC_GANTRY:
 
 
 
-
-beamline = HUST_SC_GANTRY.beamline
-first_bending_part_length = HUST_SC_GANTRY.beamline_length_part1
-particle_for_test = ParticleFactory.create_proton_along(
-        beamline.trajectory, s=first_bending_part_length, kinetic_MeV=215)
-ip = ParticleFactory.create_proton_along(
-        beamline.trajectory, s=beamline.get_length(), kinetic_MeV=215)
-def pfun(footstep):
-    start = time.time()
-    p = particle_for_test.copy()
-    ParticleRunner.run_only(p,beamline,beamline.get_length()-first_bending_part_length,footstep)
-    pp = PhaseSpaceParticle.create_from_running_particle(ip,ip.get_natural_coordinate_system(),p)
-    print(f"步长{(footstep/MM):.5}mm，用时{(time.time()-start):.5}s，x={pp.x/MM}mm")
-    return pp.x/MM
-
 if __name__ == "__main__":
-    BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
-    import time
-
-    # 测试
-    footsteps = numpy.linspace(40,10,301)*MM
-
-
-    print("runge_kutta 法")
-    # xs_runge_kutta = []
-    # for footstep in footsteps:
-    #     start = time.time()
-    #     p = particle_for_test.copy()
-    #     ParticleRunner.run_only(p,beamline,beamline.get_length()-first_bending_part_length,footstep)
-    #     pp = PhaseSpaceParticle.create_from_running_particle(ideal_particle_at_isoc,ideal_particle_at_isoc.get_natural_coordinate_system(),p)
-    #     xs_runge_kutta.append(pp.x/MM)
-    #     print(f"步长{(footstep/MM):.5}mm，用时{(time.time()-start):.5}s，x={pp.x/MM}mm")
-
-    xs_runge_kutta = BaseUtils.submit_process_task(pfun,[
-        [fs] for fs in footsteps
-    ])
-
-    Plot2.plot_xy_array(footsteps/MM,xs_runge_kutta,'r-')
-    Plot2.show()
+    E = 215 * MeV
+    P = E / Protons.CHARGE_QUANTITY
+    print(P)
