@@ -6,16 +6,16 @@ CCT 建模优化全套解决方案
 v0.1   初版 2020年12月3日
 v0.1.1
 """
-import multiprocessing
-import time
+import multiprocessing # since v0.1.1 多线程计算
+import time # since v0.1.1 统计计算时长
 from typing import Callable, Generic, List, NoReturn, Optional, Tuple, TypeVar, Union
 import matplotlib.pyplot as plt
 import math
 import sys
-import os
+import os # since v0.1.1 查看CPU核心数
 import numpy
-from scipy.integrate import solve_ivp
-import warnings
+from scipy.integrate import solve_ivp # since v0.1.1 ODE45
+import warnings # since v0.1.1 提醒方法过失
 
 # 常量
 M: float = 1.0  # 一米
@@ -257,6 +257,7 @@ class P2:
         p2_list = [1,2], [2,3], [5,4]
         则返回 [1,2,5] 和 [2,3,4]
         这个方法主要用于 matplotlib 绘图
+        since v0.1.1
         """
         return ([
             p.x for p in p2_list
@@ -1423,6 +1424,7 @@ class Magnet:
         good_field_area_width：水平垂线的长度，注意应小于等于好场区范围
         step：line2 上取点间距
         point_number：水平垂线上取点数目，越多则拟合越精确
+        since v0.1.1
         """
         # 拟合阶数
         fit_order: int = 2
@@ -1941,7 +1943,9 @@ class ParticleRunner:
     def __callback_for_runge_kutta4(particle: RunningParticle, magnet: Magnet) -> Callable[
             [float, numpy.ndarray], numpy.ndarray]:
         """
+        [p,v] --> [v,a] 将二阶微分方程转为一阶
         see BaseUtils.runge_kutta4()
+        since v0.1.1
         """
         k: float = particle.e / particle.relativistic_mass
 
@@ -1963,6 +1967,7 @@ class ParticleRunner:
             [float, numpy.ndarray], numpy.ndarray]:
         """
         see BaseUtils.solve_ode()
+        since v0.1.1
         """
         k: float = particle.e / particle.relativistic_mass
 
@@ -1995,7 +2000,7 @@ class ParticleRunner:
 
         Returns None
         -------
-
+        refactor v0.1.1 使用 runge kutta 和 加入多进程支持
         """
         if isinstance(p, RunningParticle):
             dt = footstep / p.speed
@@ -2061,7 +2066,7 @@ class ParticleRunner:
 
         Returns None
         -------
-
+        refactor v0.1.1 ode45
         """
         if isinstance(p, RunningParticle):
             dt = footstep / p.speed
@@ -2101,7 +2106,7 @@ class ParticleRunner:
 
         Returns 轨迹 np.ndarray，是三维点的数组
         -------
-
+        refactor v0.1.1 runge kutta
         """
         dt = footstep / p.speed
         t_end = length / p.speed
@@ -2134,7 +2139,7 @@ class ParticleRunner:
 
         Returns 每一步处的粒子全部信息 List[RunningParticle]
         -------
-
+        refactor v0.1.1 runge kutta
         """
         distance0 = p.distance
 
@@ -2178,7 +2183,7 @@ class ParticleRunner:
 
         Returns None
         -------
-
+        refactor v0.1.1 保存过时方法
         """
         warnings.warn(
             "run_only_deprecated 已过时，因为没有使用 Runge-Kutta 数值积分方法，误差过大", category=DeprecationWarning)
@@ -2205,7 +2210,7 @@ class ParticleRunner:
 
         Returns 轨迹 np.ndarray，是三维点的数组
         -------
-
+        refactor v0.1.1 保存过时方法
         """
         warnings.warn(
             "run_get_trajectory_deprecated 已过时，因为没有使用 Runge-Kutta 数值积分方法，误差过大", category=DeprecationWarning)
@@ -2239,7 +2244,7 @@ class ParticleRunner:
 
         Returns 每一步处的粒子全部信息 List[RunningParticle]
         -------
-
+        refactor v0.1.1 保存过时方法
         """
         warnings.warn(
             "run_get_all_info_deprecated 已过时，因为没有使用 Runge-Kutta 数值积分方法，误差过大", category=DeprecationWarning)
@@ -3372,6 +3377,7 @@ class Beamline(Line2, Magnet, ApertureObject):
         )
 
         # run
+        # refactor v0.1.1 合并计算
         ParticleRunner.run_only(
             p=rp_x + rp_y, m=self, length=length, footstep=footstep, concurrency_level=concurrency_level
         )
@@ -3917,7 +3923,7 @@ class BaseUtils:
     @staticmethod
     def is_sorted(li: List) -> bool:
         """
-        判��数组是否有序
+        判断数组是否有序
         这个方法来自 https://www.zhihu.com/question/368573897
         虽然无法快速退出，但很简洁
         """
@@ -3939,6 +3945,10 @@ class BaseUtils:
     @staticmethod
     def runge_kutta4(t0: float, t_end: float, Y0: T, y_derived_function: Callable[[float, T], T], dt: float,
                      record: bool = False) -> Union[T, Tuple[List[float], List[T]]]:
+        """
+        4 阶 runge kutta 法求解微分方程组
+        since v0.1.1
+        """
         number: int = math.ceil((t_end - t0) / dt)
         dt = (t_end - t0) / float(number)
 
@@ -3972,6 +3982,11 @@ class BaseUtils:
     def solve_ode(t0: float, t_end: float, Y0: T, y_derived_function: Callable[[float, T], T], dt: float,
                   record: bool = False, absolute_tolerance: float = 1e-8, relative_tolerance: float = 1e-8) -> Union[
             T, Tuple[List[float], List[T]]]:
+        """
+        scipy 中 ode45
+        即变步长 4 阶 runge kutta 法
+        since v0.1.1
+        """
         if record:
             raise NotImplementedError
             # number: int = math.ceil((t_end-t0)/dt)
@@ -3983,10 +3998,15 @@ class BaseUtils:
                 t0, t_end], Y0, rtol=1e-8, atol=1e-8, first_step=dt, max_step=dt)
             return s.y
 
+    # 多进程安全提示 since v0.1.1
     __I_AM_SURE_MY_CODE_CLOSED_IN_IF_NAME_EQUAL_MAIN: bool = False
 
     @classmethod
     def i_am_sure_my_code_closed_in_if_name_equal_main(cls):
+        """
+        多线程安全提示
+        since v0.1.1
+        """
         cls.__I_AM_SURE_MY_CODE_CLOSED_IN_IF_NAME_EQUAL_MAIN = True
 
     @classmethod
@@ -4002,6 +4022,8 @@ class BaseUtils:
 
         因为 python 具有全局解释器锁，所以 CPU 密集任务无法使用线程加速，只能使用进程
         see https://www.cnblogs.com/dragon-123/p/10247252.html
+
+        since v0.1.1
         """
         if not cls.__I_AM_SURE_MY_CODE_CLOSED_IN_IF_NAME_EQUAL_MAIN:
             raise PermissionError(
@@ -4560,7 +4582,8 @@ class Plot2:
 
         Plot2.plot_p2s([left_points[0], right_points[0]], describe=describe)
         Plot2.plot_p2s([left_points[-1], right_points[-1]], describe=describe)
-
+    
+    @staticmethod
     def plot_qs(qs: QS, describe="r-") -> None:
         """
         绘制 qs
@@ -4647,6 +4670,7 @@ class Plot2:
     def legend(*labels: Tuple, font_size: int = 12, font_family: str = "Times New Roman") -> NoReturn:
         """
         设置图例
+        since v0.1.1
         """
         if not Plot2.INIT:
             Plot2.__init()
