@@ -451,11 +451,13 @@ class P3:
         else:
             raise ValueError(f"无法将{ndarray}转为P3或List[P3]")
 
-    def to_numpy_ndarry3(self) -> numpy.ndarray:
+    def to_numpy_ndarry3(self, numpy_dtype=numpy.float64) -> numpy.ndarray:
         """
         点 (x,y,z) 转为 numpy 数组 [x,y,z]
+        numpy_dtype 指定数据类型
+        refactor v0.1.1 新增数据类型
         """
-        return numpy.array(self.to_list())
+        return numpy.array(self.to_list(), dtype=numpy_dtype)
 
     def to_numpy_ndarry3_float32(self) -> numpy.ndarray:
         """
@@ -2033,7 +2035,7 @@ class ParticleRunner:
             print(f"实际用时{(time.time()-start_time):.5f}秒")
             return p
         else:
-            results:List[RunningParticle] =  BaseUtils.submit_process_task(
+            results: List[RunningParticle] = BaseUtils.submit_process_task(
                 task=ParticleRunner.run_only,
                 param_list=[
                     [this_p, m, length, footstep] for this_p in p
@@ -2047,7 +2049,6 @@ class ParticleRunner:
                 p[i].distance = results[i].distance
 
             return p
-            
 
     @staticmethod
     def run_only_ode(
@@ -2805,32 +2806,37 @@ class CCT(Magnet, ApertureObject):
         )
 
         # 总匝数
-        total_disperse_number = winding_number * disperse_number_per_winding
+        self.total_disperse_number = self.winding_number * self.disperse_number_per_winding
 
         dispersed_path2: List[List[float]] = [
             self.p2_function(ksi).to_list()
             for ksi in BaseUtils.linspace(
                 self.starting_point_in_ksi_phi_coordinate.x,
                 self.end_point_in_ksi_phi_coordinate.x,
-                total_disperse_number + 1,
+                self.total_disperse_number + 1,
             )  # +1 为了满足分段正确性，即匝数 m，需要用 m+1 个点
         ]
 
-        dispersed_path3: List[List[float]] = [
-            self.p3_function(ksi).to_list()
+        self.dispersed_path3_points: List[P3] = [
+            self.p3_function(ksi)
             for ksi in BaseUtils.linspace(
                 self.starting_point_in_ksi_phi_coordinate.x,
                 self.end_point_in_ksi_phi_coordinate.x,
-                total_disperse_number + 1,
+                self.total_disperse_number + 1,
             )  # +1 为了满足分段正确性，见上
+        ]
+
+        dispersed_path3: List[List[float]] = [
+            p.to_list() for p in self.dispersed_path3_points
         ]
 
         # 为了速度，转为 numpy
         self.dispersed_path2: numpy.ndarray = numpy.array(dispersed_path2)
         self.dispersed_path3: numpy.ndarray = numpy.array(dispersed_path3)
 
-        # 电流元 current * (p[i+1] - p[i])
-        self.elementary_current = current * (
+        # 电流元 (miu0/4pi) * current * (p[i+1] - p[i])
+        # refactor v0.1.1
+        self.elementary_current = 1e-7 * current * (
             self.dispersed_path3[1:] - self.dispersed_path3[:-1]
         )
 
@@ -2940,8 +2946,10 @@ class CCT(Magnet, ApertureObject):
         # 计算每个电流元在 p 点产生的磁场 (此时还没有乘系数 μ0/4π )
         dB = numpy.cross(self.elementary_current, r) * rr
 
-        # 求和，即得到磁场，记得乘以系数 μ0/4π = 1e-7
-        B = numpy.sum(dB, axis=0) * 1e-7
+        # 求和，即得到磁场，
+        # (不用乘乘以系数 μ0/4π = 1e-7)
+        # refactor v0.1.1
+        B = numpy.sum(dB, axis=0)
 
         # 转回 P3
         B_P3: P3 = P3.from_numpy_ndarry(B)
@@ -3081,6 +3089,37 @@ class CCT(Magnet, ApertureObject):
             disperse_number_per_winding=disperse_number_per_winding,
         )
 
+    def global_path3(self) -> List[P3]:
+        """
+        获取 CCT 路径点，以全局坐标系的形式
+        主要目的是为了 CUDA 计算
+        since v0.1.1
+        """
+        return [
+            self.local_coordinate_system.point_to_global_coordinate(p)
+            for p in self.dispersed_path3_points
+        ]
+
+    def global_current_elements_and_elementary_current_positions(self, numpy_dtype=numpy.float64) -> Tuple[numpy.ndarray, numpy.ndarray]:
+        """
+        获取全局坐标系下的
+        电流元 (miu0/4pi) * current * (p[i+1] - p[i])
+        和
+        电流元的位置 (p[i+1]+p[i])/2
+        主要目的是为了 CUDA 计算
+        since v0.1.1
+        """
+        global_path3: List[P3] = self.global_path3()
+
+        global_path3_numpy_array = numpy.array([p.to_list() for p in global_path3], dtype=numpy_dtype)
+
+        return (
+            1e-7 * self.current *
+            (global_path3_numpy_array[1:] - global_path3_numpy_array[:-1]),
+            0.5 * (global_path3_numpy_array[1:] +
+                   global_path3_numpy_array[:-1])
+        )
+
 
 class QS(Magnet, ApertureObject):
     """
@@ -3112,6 +3151,18 @@ class QS(Magnet, ApertureObject):
         self.gradient = float(gradient)
         self.second_gradient = float(second_gradient)
         self.aperture_radius = float(aperture_radius)
+
+    def __str__(self) -> str:
+        """
+        since v0.1.1
+        """
+        return f"local_coordinate_system={self.local_coordinate_system}, length={self.length}, gradient={self.gradient}, second_gradient={self.second_gradient}, aperture_radius={self.aperture_radius}"
+
+    def __repr__(self) -> str:
+        """
+        since v0.1.1
+        """
+        return self.__str__()
 
     def magnetic_field_at(self, point: P3) -> P3:
         """
@@ -4860,8 +4911,12 @@ class HUST_SC_GANTRY:
     )
 
 
-
 if __name__ == "__main__":
-    E = 215 * MeV
-    P = E / Protons.CHARGE_QUANTITY
-    print(P)
+    bl = HUST_SC_GANTRY.beamline
+
+    cct: CCT = bl.magnets[15]
+
+    p = bl.trajectory.point_at(HUST_SC_GANTRY.beamline_length_part1 +
+                               HUST_SC_GANTRY.DL2+0.5).to_p3() + P3(1E-3, 1E-4, 1E-5)
+
+    print(cct.magnetic_field_at(p))
