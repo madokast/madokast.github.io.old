@@ -2,6 +2,14 @@
 
 """
 GPU CUDA 加速 cctpy 束流跟踪
+
+2020年12月8日 12点15分 核心束流跟踪功能已经完成，对比成功
+track cpu   p=p=[6.113154597337909, 3.3040914180286425, 0.000523311109090937],v=[167064623.55402908, -49760406.4059311, -14208.336331599687],v0=174317774.94179922
+track gpu32 p=p=[6.11315393447876, 3.304091215133667, 0.0005233351839706302],v=[167064624.0, -49760312.0, -14195.509765625],v0=174317776.0
+track gpu64 p=p=[6.113154597337909, 3.3040914180286425, 0.0005233111090908858],v=[167064623.55402905, -49760406.40593104, -14208.33633161914],v0=174317774.94179922
+
+利用 32 位计算，则误差约为 0.001m
+利用 64 位计算，无误差
 """
 
 from typing import Literal
@@ -53,6 +61,12 @@ class GPU_ACCELERATOR:
 
             """
             self.numpy_dtype = numpy.float64
+            
+            if self.block_dim_x > 512:
+                print(f"当前 GPU 设置为 64 位模式，块线程数{self.block_dim_x}可能过多，内核可能无法启动" + 
+                "典型异常为 pycuda._driver.LaunchError: cuLaunchKernel failed: too many resources requested for launch" + 
+                "遇到此情况，可酌情调小块线程数")
+
         else:
             raise ValueError(
                 "float_number_type 必须是 GPU_ACCELERATOR.FLOAT32 或 GPU_ACCELERATOR.FLOAT64")
@@ -207,6 +221,15 @@ class GPU_ACCELERATOR:
             printf("%.15f, %.15f, %.15f\\n", v[X], v[Y], v[Z]);
             #else
             printf("%.15lf, %.15lf, %.15lf\\n", v[X], v[Y], v[Z]);
+            #endif
+        }
+
+        // 打印矢量，一般用于 debug
+        __device__ __forceinline__ void vct6_print(FLOAT *v) {
+            #ifdef FLOAT32
+            printf("%.15f, %.15f, %.15f, %.15f, %.15f, %.15f\\n", v[X], v[Y], v[Z], v[X+DIM], v[Y+DIM], v[Z+DIM]);
+            #else
+            printf("%.15lf, %.15lf, %.15lf, %.15lf, %.15lf, %.15lf\\n", v[X], v[Y], v[Z] ,v[X+DIM], v[Y+DIM], v[Z+DIM]);
             #endif
         }
 
@@ -823,7 +846,6 @@ class GPU_ACCELERATOR:
             else:
                 raise ValueError(f"{m} 无法用 GOU 加速")
 
-        print(f"current_element_number = {current_element_number}")
 
         kls_all = numpy.concatenate(tuple(kls_list))
         p0s_all = numpy.concatenate(tuple(p0s_list))
@@ -838,6 +860,7 @@ class GPU_ACCELERATOR:
             drv.InOut(particle),
             grid=(1, 1, 1), block=(self.block_dim_x, 1, 1)
         )
+
 
         return RunningParticle.from_numpy_array_data(particle)
 
@@ -860,6 +883,11 @@ if __name__ == "__main__":
         float_number_type=GPU_ACCELERATOR.FLOAT64, block_dim_x=256)
     ga32_b256 = GPU_ACCELERATOR(
         float_number_type=GPU_ACCELERATOR.FLOAT32, block_dim_x=256)
+
+    ga64_b512 = GPU_ACCELERATOR(
+        float_number_type=GPU_ACCELERATOR.FLOAT64, block_dim_x=512)
+    ga32_b512 = GPU_ACCELERATOR(
+        float_number_type=GPU_ACCELERATOR.FLOAT32, block_dim_x=512)
 
     class Test(unittest.TestCase):
         def test_vct_length(self):
@@ -1066,6 +1094,7 @@ if __name__ == "__main__":
             p = ParticleFactory.create_proton_along(
                 bl.trajectory,HUST_SC_GANTRY.beamline_length_part1 + HUST_SC_GANTRY.DL2,215
             )
+            print(f"init p={p}")
             ParticleRunner.run_only(p,bl,1.0,10*MM)
             print(f"track cpu p={p}")
 
@@ -1073,13 +1102,13 @@ if __name__ == "__main__":
             p = ParticleFactory.create_proton_along(
                 bl.trajectory,HUST_SC_GANTRY.beamline_length_part1 + HUST_SC_GANTRY.DL2,215
             )
-            ga32.track_one_particle_with_single_qs(bl,p,1.0,10*MM)
+            p = ga32.track_one_particle_with_single_qs(bl,p,1.0,10*MM)
             print(f"track gpu32 p={p}")
 
             p = ParticleFactory.create_proton_along(
                 bl.trajectory,HUST_SC_GANTRY.beamline_length_part1 + HUST_SC_GANTRY.DL2,215
             )
-            ga64.track_one_particle_with_single_qs(bl,p,1.0,10*MM)
+            p = ga64_b512.track_one_particle_with_single_qs(bl,p,1.0,10*MM)
             print(f"track gpu64 p={p}")
 
 
