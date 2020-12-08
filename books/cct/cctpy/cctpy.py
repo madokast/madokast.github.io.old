@@ -1933,6 +1933,41 @@ class RunningParticle:
     def __str__(self) -> str:
         return f"p={self.position},v={self.velocity},v0={self.speed}"
 
+    def to_numpy_array_data(self, numpy_dtype=numpy.float64) -> numpy.ndarray:
+        """
+        RunningParticle 转为 numpy_array_data
+        主要用于 GPU 加速
+        numpy_array_data 是一个一维数组，分别是 
+        (px0, py1, pz2, vx3, vy4, vz5, rm6, e7, speed8, distance9) len = 10
+
+        since v0.1.1
+        """
+        data_list: List[float] = (
+            self.position.to_list() +
+            self.velocity.to_list() +
+            [self.relativistic_mass, self.e, self.speed, self.distance]
+        )
+        return numpy.array(data_list, dtype=numpy_dtype)
+
+    @staticmethod
+    def from_numpy_array_data(numpy_array) -> 'RunningParticle':
+        """
+        上函数的逆函数
+        see to_numpy_array_data
+        since v0.1.1
+        """
+        pos = P3(numpy_array[0], numpy_array[1], numpy_array[2])
+        vel = P3(numpy_array[3], numpy_array[4], numpy_array[5])
+
+        return RunningParticle(
+            position=pos,
+            velocity=vel,
+            relativistic_mass=numpy_array[6],
+            e=numpy_array[7],
+            speed=numpy_array[8],
+            distance=numpy_array[9]
+        )
+
 
 class ParticleRunner:
     """
@@ -3106,7 +3141,8 @@ class CCT(Magnet, ApertureObject):
         """
         global_path3: List[P3] = self.global_path3()
 
-        global_path3_numpy_array = numpy.array([p.to_list() for p in global_path3], dtype=numpy_dtype)
+        global_path3_numpy_array = numpy.array(
+            [p.to_list() for p in global_path3], dtype=numpy_dtype)
 
         return (
             1e-7 * self.current *

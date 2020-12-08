@@ -10,6 +10,7 @@ import pycuda.driver as drv
 from pycuda.compiler import SourceModule
 import numpy
 import time
+import sys
 
 from scipy.optimize.optimize import main
 from cctpy import *
@@ -64,11 +65,24 @@ class GPU_ACCELERATOR:
         #define FLOAT double
         #endif
 
-
+        // 维度 三维
         #define DIM (3)
+        // 维度索引 0 1 2 表示 X Y Z
         #define X (0)
         #define Y (1)
         #define Z (2)
+        // 粒子参数索引 (px0, py1, pz2, vx3, vy4, vz5, rm6 相对质量, e7 电荷量, speed8 速率, distance9 运动距离)
+        #define PX (0)
+        #define PY (1)
+        #define PZ (2)
+        #define VX (3)
+        #define VY (4)
+        #define VZ (5)
+        #define RM (6)
+        #define E (7)
+        #define SPEED (8)
+        #define DISTANCE (9)
+
         #define BLOCK_DIM_X ({block_dim_x})
         """.format(block_dim_x=self.block_dim_x)
 
@@ -160,6 +174,16 @@ class GPU_ACCELERATOR:
             des[Z] = src[Z];
         }
 
+        // 向量拷贝赋值
+        __device__ __forceinline__ void vct6_copy(FLOAT *src, FLOAT *des) {
+            des[X] = src[X];
+            des[Y] = src[Y];
+            des[Z] = src[Z];
+            des[X+DIM] = src[X+DIM];
+            des[Y+DIM] = src[Y+DIM];
+            des[Z+DIM] = src[Z+DIM];
+        }
+
         // 求向量长度
         __device__ __forceinline__ FLOAT vct_len(FLOAT *v) {
 
@@ -233,7 +257,9 @@ class GPU_ACCELERATOR:
         // number 表示电流元数目
         // kls 每 DIM = 3 组表示一个 kl
         // p0s 每 DIM = 3 组表示一个 p0
-        __device__ void current_element_B(FLOAT *kls, FLOAT *p0s, int number, FLOAT *p, FLOAT *ret){
+        // shared_ret 应该是一个 shared 量，保存返回值
+        // 调用该方法后，应该同步处理  __syncthreads();
+        __device__ void current_element_B(FLOAT *kls, FLOAT *p0s, int number, FLOAT *p, FLOAT *shared_ret){
             int tid = threadIdx.x; // 0-1023 (decide by BLOCK_DIM_X)
             FLOAT db[DIM];
             __shared__ FLOAT s_dbs[DIM*BLOCK_DIM_X];
@@ -252,7 +278,7 @@ class GPU_ACCELERATOR:
                 if(tid<step) vct_add_local(s_dbs + tid * DIM, s_dbs + (tid + step) * DIM);
             }
 
-            if(tid == 0) vct_copy(s_dbs, ret);
+            if(tid == 0) vct_copy(s_dbs, shared_ret);
         }
 
         """
@@ -261,8 +287,8 @@ class GPU_ACCELERATOR:
         // 计算 QS 在 p 点产生的磁场
         // origin xi yi zi 分别是 QS 的局部坐标系
         // 这个函数只需要单线程计算
-        __device__ __forceinline__ void magnet_at_qs(FLOAT *origin, FLOAT *xi, 
-                FLOAT *yi, FLOAT *zi, FLOAT length, FLOAT gradient, FLOAT second_gradient, FLOAT aper_r, FLOAT *p, FLOAT* ret){
+        __device__ __forceinline__ void magnet_at_qs(FLOAT *origin, FLOAT *xi, FLOAT *yi, FLOAT *zi, 
+                FLOAT length, FLOAT gradient, FLOAT second_gradient, FLOAT aper_r, FLOAT *p, FLOAT* ret){
             FLOAT temp1[DIM];
             FLOAT temp2[DIM];
 
@@ -301,12 +327,53 @@ class GPU_ACCELERATOR:
         
         """
 
-        cuda_code_06_runge_kutta4 = """
+        cuda_code_06_magnet_at = """
+        // 整个束线在 p 点产生得磁场（只有一个 QS 磁铁！）
+        // FLOAT *kls, FLOAT* p0s, int current_element_number 和 CCT 电流元相关
+        // FLOAT *qs_data 表示 QS 磁铁所有参数，分别是局部坐标系（原点origin,三个轴xi yi zi，长度 梯度 二阶梯度 孔径）
+        // p 表示要求磁场得全局坐标点
+        // shared_ret 表示磁场返回值（应该是一个 __shared__）
+        // 本方法已经完成同步了，不用而外调用 __syncthreads();
+        __device__ void magnet_with_single_qs(FLOAT *kls, FLOAT* p0s, int current_element_number, 
+                FLOAT *qs_data, FLOAT *p, FLOAT *shared_ret){
+            int tid = threadIdx.x;
+            FLOAT qs_magnet[DIM];
+            
+            current_element_B(kls, p0s, current_element_number, p, shared_ret);
+            __syncthreads(); // 块内同步
+
+            
+            if(tid == 0){
+                // 计算 QS 的磁场确实不能并行
+                // 也没有必要让每个线程都重复计算一次
+                // 虽然两次同步有点麻烦，但至少只有一个线程束参与运行
+                magnet_at_qs(
+                    qs_data, // origin
+                    qs_data + 3, //xi
+                    qs_data + 6, //yi
+                    qs_data + 9, //zi
+                    *(qs_data + 12), // len
+                    *(qs_data + 13), // g
+                    *(qs_data + 14), // sg
+                    *(qs_data + 15), // aper r
+                    p, qs_magnet
+                );
+
+                vct_add_local(shared_ret, qs_magnet);
+            }
+            __syncthreads(); // 块内同步
+        }
+        """
+
+        cuda_code_07_runge_kutta4 = """
         // runge_kutta4 代码和 cctpy 中的 runge_kutta4 一模一样
         // Y0 数组长度为 6
         // Y0 会发生变化，既是输入也是输出
         // 为了分析包络等，会出一个记录全部 YO 的函数
-        // 这个函数也是单线程运行
+        // 这个函数单线程运行
+
+        // void (*call)(FLOAT,FLOAT*,FLOAT*) 表示 tn Yn 到 Yn+1 的转义，实际使用中还会带更多参数（C 语言没有闭包）
+        // 所以这个函数仅仅是原型
         __device__ void runge_kutta4(FLOAT t0, FLOAT t_end, FLOAT *Y0, void (*call)(FLOAT,FLOAT*,FLOAT*), FLOAT dt){
             #ifdef FLOAT32
             int number = (int)(ceilf((t_end - t0) / dt));
@@ -348,25 +415,132 @@ class GPU_ACCELERATOR:
                 vct6_add_local(Y0, temp);
                 // Y0 += (dt / 6) * (k1 + 2 * k2 + 2 * k3 + k4);
             }
-
-            
         }
+
         """
 
-        cuda_code_07_run_only = """
-        // 单个粒子跟踪
-        // FLOAT *kls, FLOAT *p0s, int number 电流元相关
-        // FLOAT *qs_data, int qs_number
-        // 这个函数也是单线程运行
-        __device__ void track_particle(Float* particle, Float length, Float footstep,
-            FLOAT *kls, FLOAT *p0s, int current_element_number, FLOAT *qs_data, int qs_number){
-            // TODO 
-            // 确定参数
+        cuda_code_08_run_only = """
+        // runge_kutta4_for_magnet_with_single_qs 函数用到的回调
+        // FLOAT t0, FLOAT* Y0, FLOAT* Y1 微分计算
+        // 其中 Y = [P, V]
+        // FLOAT k = particle[E] / particle[RM]; // k: float = particle.e / particle.relativistic_mass
+        // FLOAT *kls, FLOAT* p0s, int current_element_number, 表示所有电流元
+        // FLOAT *qs_data 表示一个 QS 磁铁
+        __device__ void callback_for_runge_kutta4_for_magnet_with_single_qs(
+            FLOAT t0, FLOAT* Y0, FLOAT* Y1, FLOAT k, 
+            FLOAT *kls, FLOAT* p0s, int current_element_number, 
+            FLOAT *qs_data
+        )
+        {
+            int tid = threadIdx.x;
+            __shared__ FLOAT m[DIM]; // 磁场
+            magnet_with_single_qs(kls, p0s, current_element_number, qs_data, Y0, m); //Y0 只使用前3项，表示位置。已同步
 
+            if(tid == 0){ // 单线程完成即可
+                // ------------ 以下两步计算加速度，写入 Y1 + 3 中 ----------
+                // Y0 + 3 是原速度 v
+                // Y1 + 3 用于存加速度，即 v × m，还没有乘 k = e/rm
+                vct_cross(Y0 + 3, m, Y1 + 3);
+                vct_dot_a_v(k,  Y1 + 3); // 即 (v × m) * a，并且把积存在 Y1 + 3 中
+
+                // ------------- 以下把原速度复制到 Y1 中 ------------
+                vct_copy(Y0 + 3, Y1); // Y0 中后三项，速度。复制到 Y1 的前3项
+            }
+
+            __syncthreads(); // 块内同步
+        }
+
+        // 单个粒子跟踪
+        // runge_kutta4 函数用于 magnet_with_single_qs 的版本，即粒子跟踪
+        // Y0 即是 [P, v] 粒子位置、粒子速度
+        // void (*call)(FLOAT,FLOAT*,FLOAT*,FLOAT,FLOAT*,FLOAT*,int,FLOAT*) 改为 callback_for_runge_kutta4_for_magnet_with_single_qs
+        // 前 3 项 FLOAT,FLOAT*,FLOAT* 和函数原型 runge_kutta4 函数一样，即 t0 Y0 Y1
+        // 第 4 项，表示 k = particle[E] / particle[RM]; // k: float = particle.e / particle.relativistic_mass
+        // 第 567 项，FLOAT*,FLOAT*,int 表示所有电流源，FLOAT *kls, FLOAT* p0s, int current_element_number
+        // 最后一项，表示 qs_data
+        // particle 表示粒子 (px0, py1, pz2, vx3, vy4, vz5, rm6, e7, speed8, distance9) len = 10
+        __global__ void track_for_magnet_with_single_qs(FLOAT *distance, FLOAT *footstep,
+                FLOAT *kls, FLOAT* p0s, int *current_element_number, 
+                FLOAT *qs_data, FLOAT *particle)
+        {
+            int tid = threadIdx.x;
+            FLOAT t0 = 0.0; // 开始时间为 0
+            FLOAT t_end = (*distance) / particle[SPEED]; // 用时 = 距离/速率
+            
+            #ifdef FLOAT32
+            int number = (int)(ceilf( (*distance) / (*footstep) ));
+            #else
+            int number = (int)(ceil( (*distance) / (*footstep)));
+            #endif
+
+            FLOAT dt = (t_end - t0) / ((FLOAT)(number));
+            FLOAT k = particle[E] / particle[RM]; // k: float = particle.e / particle.relativistic_mass
+
+            __shared__ FLOAT Y0[DIM*2]; // Y0 即是 [P, v] 粒子位置、粒子速度，就是 particle 前两项
+            __shared__ FLOAT k1[DIM*2];
+            __shared__ FLOAT k2[DIM*2];
+            __shared__ FLOAT k3[DIM*2];
+            __shared__ FLOAT k4[DIM*2];
+            __shared__ FLOAT temp[DIM*2];
+
+            if(tid == 0){
+                vct6_copy(particle, Y0); // 写 Y0
+            }
+
+            for(int ignore = 0; ignore < number; ignore++){
+                __syncthreads(); // 循环前同步
+
+                callback_for_runge_kutta4_for_magnet_with_single_qs(t0, Y0, k1, k, kls, p0s, *current_element_number, qs_data); // 已同步
+
+
+                if(tid == 0){
+                    vct6_dot_a_v_ret(dt / 2., k1, temp); // temp = dt / 2 * k1
+                    vct6_add_local(temp, Y0); // temp =  Y0 + temp
+                }
+                __syncthreads();
+
+                callback_for_runge_kutta4_for_magnet_with_single_qs(t0 + dt / 2., temp, k2, k, kls, p0s, *current_element_number, qs_data);
+
+                if(tid == 0){
+                    vct6_dot_a_v_ret(dt / 2., k2, temp); // temp = dt / 2 * k2
+                    vct6_add_local(temp, Y0); // temp =  Y0 + temp
+                }
+                __syncthreads();
+
+                callback_for_runge_kutta4_for_magnet_with_single_qs(t0 + dt / 2., temp, k3, k, kls, p0s, *current_element_number, qs_data);
+
+                if(tid == 0){
+                    vct6_dot_a_v_ret(dt, k3, temp); // temp = dt * k3
+                    vct6_add_local(temp, Y0); // temp =  Y0 + temp
+                }
+                __syncthreads();
+
+                callback_for_runge_kutta4_for_magnet_with_single_qs(t0 + dt, temp, k4, k, kls, p0s, *current_element_number, qs_data);
+
+                t0 += dt;
+
+                if(tid == 0){
+                    vct6_add(k1, k4, temp); // temp = k1 + k4
+                    vct6_dot_a_v(2.0, k2);
+                    vct6_dot_a_v(2.0, k3);
+                    vct6_add(k2, k3, k1); // k1 已经没用了，所以装 k1 = k2 + k3
+                    vct6_add_local(temp, k1);
+                    vct6_dot_a_v(dt / 6.0, temp);
+                    vct6_add_local(Y0, temp);
+                    // Y0 += (dt / 6) * (k1 + 2 * k2 + 2 * k3 + k4);
+                }
+            }
+
+            // 写回 particle
+            if(tid == 0){
+                vct6_copy(Y0 ,particle); // 写 Y0
+                particle[DISTANCE] = *distance;
+            }
+
+            __syncthreads();
         }
         
         """
-
 
         self.cuda_code: str = (
             cuda_code_00_include +
@@ -374,8 +548,10 @@ class GPU_ACCELERATOR:
             cuda_code_02_define +
             cuda_code_03_vct_functions +
             cuda_code_04_dB +
-            cuda_code_05_QS + 
-            cuda_code_06_runge_kutta4
+            cuda_code_05_QS +
+            cuda_code_06_magnet_at +
+            cuda_code_07_runge_kutta4 +
+            cuda_code_08_run_only
         )
 
     def vct_length(self, p3: P3):
@@ -469,7 +645,10 @@ class GPU_ACCELERATOR:
 
         code = """
         __global__ void ce(FLOAT *kls, FLOAT *p0s, int* number, FLOAT *p, FLOAT *ret){
-            current_element_B(kls,p0s,*number,p,ret);
+            __shared__ FLOAT s_ret[DIM];
+            int tid = threadIdx.x;
+            current_element_B(kls,p0s,*number,p,s_ret);
+            if(tid == 0) vct_copy(s_ret, ret);
         }
 
         """
@@ -547,31 +726,363 @@ class GPU_ACCELERATOR:
         ret = numpy.empty((3,), dtype=self.numpy_dtype)
 
         mq(drv.In(qs_data.astype(self.numpy_dtype)),
-        drv.In(p.to_numpy_ndarry3(numpy_dtype=self.numpy_dtype)),
-        drv.Out(ret),
-        grid=(1, 1, 1), block=(1, 1, 1)
+           drv.In(p3.to_numpy_ndarry3(numpy_dtype=self.numpy_dtype)),
+           drv.Out(ret),
+           grid=(1, 1, 1), block=(1, 1, 1)
+           )
+
+        return P3.from_numpy_ndarry(ret)
+
+    def magnet_at(self, bl: Beamline, p: P3)->P3:
+        """
+        CCT 和 QS 合起来测试
+        """
+        code = """
+        __global__ void ma(FLOAT *kls, FLOAT* p0s, int* current_element_number, 
+                FLOAT *qs_data, FLOAT *p, FLOAT *ret){
+            int tid = threadIdx.x;
+            __shared__ FLOAT shared_ret[DIM];
+
+            magnet_with_single_qs(kls, p0s, *current_element_number, qs_data, p, shared_ret);
+
+            if(tid == 0) vct_copy(shared_ret, ret);
+        }
+        """
+
+        mod = SourceModule(self.cuda_code + code)
+
+        ma = mod.get_function('ma')
+
+        ret = numpy.empty((3,), dtype=self.numpy_dtype)
+
+        kls_list: List[numpy.ndarray] = []
+        p0s_list: List[numpy.ndarray] = []
+        current_element_number = 0
+
+        qs_data = None
+        for m in bl.magnets:
+            if isinstance(m, CCT):
+                cct = m
+                kls, p0s = cct.global_current_elements_and_elementary_current_positions(
+                    numpy_dtype=self.numpy_dtype)
+                current_element_number += cct.total_disperse_number
+                kls_list.append(kls)
+                p0s_list.append(p0s)
+            elif isinstance(m, QS):
+                qs = m
+                qs_data = numpy.array(
+                    qs.local_coordinate_system.location.to_list(
+                    ) + qs.local_coordinate_system.XI.to_list()
+                    + qs.local_coordinate_system.YI.to_list() + qs.local_coordinate_system.ZI.to_list()
+                    + [qs.length, qs.gradient, qs.second_gradient, qs.aperture_radius], dtype=self.numpy_dtype)
+            else:
+                raise ValueError(f"{m} 无法用 GOU 加速")
+
+        kls_all = numpy.concatenate(tuple(kls_list))
+        p0s_all = numpy.concatenate(tuple(p0s_list))
+
+        ma(
+            drv.In(kls_all),
+            drv.In(p0s_all),
+            drv.In(numpy.array([current_element_number], dtype=numpy.int32)),
+            drv.In(qs_data),
+            drv.In(p.to_numpy_ndarry3(numpy_dtype=self.numpy_dtype)),
+            drv.Out(ret),
+            grid=(1, 1, 1), block=(self.block_dim_x, 1, 1)
         )
 
         return P3.from_numpy_ndarry(ret)
 
+    def track_one_particle_with_single_qs(self, bl: Beamline, p: RunningParticle, distance:float, footstep:float):
+        mod = SourceModule(self.cuda_code)
+
+        track = mod.get_function('track_for_magnet_with_single_qs')
+
+        particle = p.to_numpy_array_data(numpy_dtype=self.numpy_dtype)
+
+        kls_list: List[numpy.ndarray] = []
+        p0s_list: List[numpy.ndarray] = []
+        current_element_number = 0
+
+        qs_data = None
+        for m in bl.magnets:
+            if isinstance(m, CCT):
+                cct = m
+                kls, p0s = cct.global_current_elements_and_elementary_current_positions(
+                    numpy_dtype=self.numpy_dtype)
+                current_element_number += cct.total_disperse_number
+                kls_list.append(kls)
+                p0s_list.append(p0s)
+            elif isinstance(m, QS):
+                qs = m
+                qs_data = numpy.array(
+                    qs.local_coordinate_system.location.to_list(
+                    ) + qs.local_coordinate_system.XI.to_list()
+                    + qs.local_coordinate_system.YI.to_list() + qs.local_coordinate_system.ZI.to_list()
+                    + [qs.length, qs.gradient, qs.second_gradient, qs.aperture_radius], dtype=self.numpy_dtype)
+            else:
+                raise ValueError(f"{m} 无法用 GOU 加速")
+
+        print(f"current_element_number = {current_element_number}")
+
+        kls_all = numpy.concatenate(tuple(kls_list))
+        p0s_all = numpy.concatenate(tuple(p0s_list))
+
+        track(
+            drv.In(numpy.array([distance],dtype=self.numpy_dtype)),
+            drv.In(numpy.array([footstep],dtype=self.numpy_dtype)),
+            drv.In(kls_all),
+            drv.In(p0s_all),
+            drv.In(numpy.array([current_element_number], dtype=numpy.int32)),
+            drv.In(qs_data),
+            drv.InOut(particle),
+            grid=(1, 1, 1), block=(self.block_dim_x, 1, 1)
+        )
+
+        return RunningParticle.from_numpy_array_data(particle)
+
+
 
 if __name__ == "__main__":
+    # 测试
+    import unittest
+
     bl = HUST_SC_GANTRY.beamline
-    qs: QS = bl.magnets[23]
-    p = bl.trajectory.point_at(HUST_SC_GANTRY.beamline_length_part1+HUST_SC_GANTRY.DL2 +
-                               1.19+HUST_SC_GANTRY.GAP1+HUST_SC_GANTRY.qs3_length/2).to_p3() + P3(10*MM, 10*MM, 10*MM)
-    print(qs.magnetic_field_at(p))
-    ga = GPU_ACCELERATOR(float_number_type=GPU_ACCELERATOR.FLOAT64)
+    ga64 = GPU_ACCELERATOR(float_number_type=GPU_ACCELERATOR.FLOAT64)
+    ga32 = GPU_ACCELERATOR(float_number_type=GPU_ACCELERATOR.FLOAT32)
 
-    qs_data = numpy.array(
-        qs.local_coordinate_system.location.to_list() + qs.local_coordinate_system.XI.to_list()
-        + qs.local_coordinate_system.YI.to_list() + qs.local_coordinate_system.ZI.to_list() 
-        + [qs.length, qs.gradient, qs.second_gradient, qs.aperture_radius]
-        ,dtype=numpy.float64)
+    ga64_b128 = GPU_ACCELERATOR(
+        float_number_type=GPU_ACCELERATOR.FLOAT64, block_dim_x=128)
+    ga32_b128 = GPU_ACCELERATOR(
+        float_number_type=GPU_ACCELERATOR.FLOAT32, block_dim_x=128)
 
-    b =  ga.magnet_at_qs(
-        qs_data=qs_data,
-        p3=p
-    )
+    ga64_b256 = GPU_ACCELERATOR(
+        float_number_type=GPU_ACCELERATOR.FLOAT64, block_dim_x=256)
+    ga32_b256 = GPU_ACCELERATOR(
+        float_number_type=GPU_ACCELERATOR.FLOAT32, block_dim_x=256)
 
-    print(b)
+    class Test(unittest.TestCase):
+        def test_vct_length(self):
+            v = P3(1, 1, 1)
+            length_cpu = v.length()
+            length_gpu_32 = ga32.vct_length(v)
+            length_gpu_64 = ga64.vct_length(v)
+
+            print(f"test_vct_length 32 ={length_gpu_32 - length_cpu}")
+            print(f"test_vct_length 64 ={length_gpu_64 - length_cpu}")
+
+            self.assertTrue((length_gpu_32 - length_cpu) < 1e-6)
+            self.assertTrue((length_gpu_64 - length_cpu) < 1e-14)
+
+        def test_print(self):
+            v = P3(1/3, 1/6, 1/7)
+            ga32.vct_print(v)
+            ga64.vct_print(v)
+            self.assertTrue(True)
+
+        def test_cct(self):
+            cct: CCT = bl.magnets[15]
+            p_cct = bl.trajectory.point_at(
+                HUST_SC_GANTRY.beamline_length_part1+HUST_SC_GANTRY.DL2+0.5).to_p3() + P3(1E-3, 1E-4, 1E-5)
+
+            magnet_cpu = cct.magnetic_field_at(p_cct)
+
+            kls, p0s = cct.global_current_elements_and_elementary_current_positions(
+                numpy_dtype=numpy.float64)
+
+            magnet_gpu_32 = ga32.current_element_B(
+                kls.flatten(),
+                p0s.flatten(),
+                cct.total_disperse_number,
+                p_cct,
+            )
+
+            magnet_gpu_64 = ga64.current_element_B(
+                kls.flatten(),
+                p0s.flatten(),
+                cct.total_disperse_number,
+                p_cct,
+            )
+
+            print(f"test_cct, diff_32={magnet_cpu-magnet_gpu_32}")
+            print(f"test_cct, diff_64={magnet_cpu-magnet_gpu_64}")
+            self.assertTrue((magnet_cpu-magnet_gpu_32).length() < 1e-6)
+            self.assertTrue((magnet_cpu-magnet_gpu_64).length() < 1e-14)
+
+        def test_qs(self):
+            qs: QS = bl.magnets[23]
+            p_qs = (bl.trajectory.point_at(HUST_SC_GANTRY.beamline_length_part1+HUST_SC_GANTRY.DL2 +
+                                           1.19+HUST_SC_GANTRY.GAP1+HUST_SC_GANTRY.qs3_length/2).to_p3() +
+                    P3(10*MM, 10*MM, 10*MM))
+            magnet_cpu = qs.magnetic_field_at(p_qs)
+            qs_data = numpy.array(
+                qs.local_coordinate_system.location.to_list(
+                ) + qs.local_coordinate_system.XI.to_list()
+                + qs.local_coordinate_system.YI.to_list() + qs.local_coordinate_system.ZI.to_list()
+                + [qs.length, qs.gradient, qs.second_gradient, qs.aperture_radius], dtype=numpy.float64)
+            magnet_gpu_32 = ga32.magnet_at_qs(
+                qs_data=qs_data,
+                p3=p_qs
+            )
+            magnet_gpu_64 = ga64.magnet_at_qs(
+                qs_data=qs_data,
+                p3=p_qs
+            )
+            print(f"test_qs, diff_32={magnet_cpu-magnet_gpu_32}")
+            print(f"test_qs, diff_64={magnet_cpu-magnet_gpu_64}")
+            self.assertTrue((magnet_cpu-magnet_gpu_32).length() < 1e-6)
+            self.assertTrue((magnet_cpu-magnet_gpu_64).length() < 1e-14)
+
+        def test_magnet_at0(self):
+            p_cct = bl.trajectory.point_at(
+                HUST_SC_GANTRY.beamline_length_part1+HUST_SC_GANTRY.DL2+0.5).to_p3() + P3(1E-3, 1E-4, 1E-5)
+            
+            magnet_cpu = bl.magnetic_field_at(p_cct)
+
+            magnet_gpu_64 = ga64.magnet_at(bl,p_cct)
+            magnet_gpu_32 = ga32.magnet_at(bl,p_cct)
+
+            print(f"test_magnet_at0 diff32 = {magnet_cpu - magnet_gpu_32}")
+            print(f"test_magnet_at0 diff64 = {magnet_cpu - magnet_gpu_64}")
+
+            print(f"-- test_magnet_at0 all beamline--")
+            print(f"magnet_cpu = {magnet_cpu}")
+            print(f"magnet_gpu_32 = {magnet_gpu_32}")
+            print(f"magnet_gpu_64 = {magnet_gpu_64}")
+            # test_magnet_at0 diff32 = [-9.995611723045972e-08, -2.9023106392321585e-07, -2.0517209438075668e-06]
+            # test_magnet_at0 diff64 = [-1.5404344466674047e-15, -2.1805474093028465e-15, 0.0]
+            self.assertTrue((magnet_cpu-magnet_gpu_32).length() < 1e-5)
+            self.assertTrue((magnet_cpu-magnet_gpu_64).length() < 1e-14)
+
+        def test_magnet_at1(self):
+            p_cct = bl.trajectory.point_at(
+                HUST_SC_GANTRY.beamline_length_part1+HUST_SC_GANTRY.DL2+0.5).to_p3() + P3(1E-3, 1E-4, 1E-5)
+            
+            magnet_cpu = bl.magnetic_field_at(p_cct)
+
+            magnet_gpu_64 = ga64_b128.magnet_at(bl,p_cct)
+            magnet_gpu_32 = ga32_b128.magnet_at(bl,p_cct)
+
+            print(f"test_magnet_at1 diff32 = {magnet_cpu - magnet_gpu_32}")
+            print(f"test_magnet_at1 diff64 = {magnet_cpu - magnet_gpu_64}")
+
+            print(f"-- test_magnet_at0 all beamline--")
+            print(f"magnet_cpu = {magnet_cpu}")
+            print(f"magnet_gpu_32 = {magnet_gpu_32}")
+            print(f"magnet_gpu_64 = {magnet_gpu_64}")
+            # test_cct, diff_32=[2.5088516841798025e-07, -2.2562693963168456e-07, -4.375363960029688e-08]
+            # test_cct, diff_64=[2.4424906541753444e-15, 9.43689570931383e-16, 8.881784197001252e-16]
+            self.assertTrue((magnet_cpu-magnet_gpu_32).length() < 1e-5)
+            self.assertTrue((magnet_cpu-magnet_gpu_64).length() < 1e-14)
+
+        def test_magnet_at2(self):
+            p_cct = bl.trajectory.point_at(
+                HUST_SC_GANTRY.beamline_length_part1+HUST_SC_GANTRY.DL2+0.5).to_p3() + P3(1E-3, 1E-4, 1E-5)
+            
+            magnet_cpu = bl.magnetic_field_at(p_cct)
+
+            magnet_gpu_64 = ga64_b256.magnet_at(bl,p_cct)
+            magnet_gpu_32 = ga32_b256.magnet_at(bl,p_cct)
+
+            print(f"test_magnet_at2 diff32 = {magnet_cpu - magnet_gpu_32}")
+            print(f"test_magnet_at2 diff64 = {magnet_cpu - magnet_gpu_64}")
+
+            print(f"-- test_magnet_at0 all beamline--")
+            print(f"magnet_cpu = {magnet_cpu}")
+            print(f"magnet_gpu_32 = {magnet_gpu_32}")
+            print(f"magnet_gpu_64 = {magnet_gpu_64}")
+            # test_cct, diff_32=[2.5088516841798025e-07, -2.2562693963168456e-07, -4.375363960029688e-08]
+            # test_cct, diff_64=[2.4424906541753444e-15, 9.43689570931383e-16, 8.881784197001252e-16]
+            self.assertTrue((magnet_cpu-magnet_gpu_32).length() < 1e-5)
+            self.assertTrue((magnet_cpu-magnet_gpu_64).length() < 1e-14)
+
+        def test_magnet_at3(self):
+            p_qs = (bl.trajectory.point_at(HUST_SC_GANTRY.beamline_length_part1+HUST_SC_GANTRY.DL2 +
+                                           1.19+HUST_SC_GANTRY.GAP1+HUST_SC_GANTRY.qs3_length/2).to_p3() +
+                    P3(10*MM, 10*MM, 10*MM))
+            
+            magnet_cpu = bl.magnetic_field_at(p_qs)
+
+            magnet_gpu_64 = ga64.magnet_at(bl,p_qs)
+            magnet_gpu_32 = ga32.magnet_at(bl,p_qs)
+
+            print(f"test_magnet_at3 diff32 = {magnet_cpu - magnet_gpu_32}")
+            print(f"test_magnet_at3 diff64 = {magnet_cpu - magnet_gpu_64}")
+
+            print(f"-- test_magnet_at0 all beamline--")
+            print(f"magnet_cpu = {magnet_cpu}")
+            print(f"magnet_gpu_32 = {magnet_gpu_32}")
+            print(f"magnet_gpu_64 = {magnet_gpu_64}")
+            # test_magnet_at0 diff32 = [-2.2375529054596832e-08, -6.045702764800875e-08, -4.853957882300364e-07]
+            # test_magnet_at0 diff64 = [4.0245584642661925e-16, -1.5959455978986625e-16, -3.608224830031759e-16]
+            self.assertTrue((magnet_cpu-magnet_gpu_32).length() < 1e-5)
+            self.assertTrue((magnet_cpu-magnet_gpu_64).length() < 1e-14)
+
+        def test_magnet_at4(self):
+            p_qs = (bl.trajectory.point_at(HUST_SC_GANTRY.beamline_length_part1+HUST_SC_GANTRY.DL2 +
+                                           1.19+HUST_SC_GANTRY.GAP1+HUST_SC_GANTRY.qs3_length/2).to_p3() +
+                    P3(10*MM, 10*MM, 10*MM))
+            
+            magnet_cpu = bl.magnetic_field_at(p_qs)
+
+            magnet_gpu_64 = ga64_b128.magnet_at(bl,p_qs)
+            magnet_gpu_32 = ga32_b128.magnet_at(bl,p_qs)
+
+            print(f"test_magnet_at4 diff32 = {magnet_cpu - magnet_gpu_32}")
+            print(f"test_magnet_at4 diff64 = {magnet_cpu - magnet_gpu_64}")
+
+            print(f"-- test_magnet_at0 all beamline--")
+            print(f"magnet_cpu = {magnet_cpu}")
+            print(f"magnet_gpu_32 = {magnet_gpu_32}")
+            print(f"magnet_gpu_64 = {magnet_gpu_64}")
+            # test_magnet_at0 diff32 = [-2.2375529054596832e-08, -5.673173734954684e-08, -4.704946270361887e-07]
+            # test_magnet_at0 diff64 = [4.0245584642661925e-16, -1.6653345369377348e-16, -3.608224830031759e-16]
+            self.assertTrue((magnet_cpu-magnet_gpu_32).length() < 1e-5)
+            self.assertTrue((magnet_cpu-magnet_gpu_64).length() < 1e-14)
+
+        def test_magnet_at5(self):
+            p_qs = (bl.trajectory.point_at(HUST_SC_GANTRY.beamline_length_part1+HUST_SC_GANTRY.DL2 +
+                                           1.19+HUST_SC_GANTRY.GAP1+HUST_SC_GANTRY.qs3_length/2).to_p3() +
+                    P3(10*MM, 10*MM, 10*MM))
+            
+            magnet_cpu = bl.magnetic_field_at(p_qs)
+
+            magnet_gpu_64 = ga64_b256.magnet_at(bl,p_qs)
+            magnet_gpu_32 = ga32_b256.magnet_at(bl,p_qs)
+
+            print(f"test_magnet_at5 diff32 = {magnet_cpu - magnet_gpu_32}")
+            print(f"test_magnet_at5 diff64 = {magnet_cpu - magnet_gpu_64}")
+
+            print(f"-- test_magnet_at0 all beamline--")
+            print(f"magnet_cpu = {magnet_cpu}")
+            print(f"magnet_gpu_32 = {magnet_gpu_32}")
+            print(f"magnet_gpu_64 = {magnet_gpu_64}")
+            # test_magnet_at0 diff32 = [-2.2375529054596832e-08, -6.045702764800875e-08, -4.853957882300364e-07]
+            # test_magnet_at0 diff64 = [3.885780586188048e-16, -1.5959455978986625e-16, -3.608224830031759e-16]
+            self.assertTrue((magnet_cpu-magnet_gpu_32).length() < 1e-5)
+            self.assertTrue((magnet_cpu-magnet_gpu_64).length() < 1e-14)
+        
+        def test_track(self):
+            p = ParticleFactory.create_proton_along(
+                bl.trajectory,HUST_SC_GANTRY.beamline_length_part1 + HUST_SC_GANTRY.DL2,215
+            )
+            ParticleRunner.run_only(p,bl,1.0,10*MM)
+            print(f"track cpu p={p}")
+
+
+            p = ParticleFactory.create_proton_along(
+                bl.trajectory,HUST_SC_GANTRY.beamline_length_part1 + HUST_SC_GANTRY.DL2,215
+            )
+            ga32.track_one_particle_with_single_qs(bl,p,1.0,10*MM)
+            print(f"track gpu32 p={p}")
+
+            p = ParticleFactory.create_proton_along(
+                bl.trajectory,HUST_SC_GANTRY.beamline_length_part1 + HUST_SC_GANTRY.DL2,215
+            )
+            ga64.track_one_particle_with_single_qs(bl,p,1.0,10*MM)
+            print(f"track gpu64 p={p}")
+
+
+    # Test().test_magnet_at0()
+    Test().test_track()
+    # unittest.main(verbosity=1)
