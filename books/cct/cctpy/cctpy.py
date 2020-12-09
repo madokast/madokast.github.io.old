@@ -6,16 +6,16 @@ CCT 建模优化全套解决方案
 v0.1   初版 2020年12月3日
 v0.1.1
 """
-import multiprocessing # since v0.1.1 多线程计算
-import time # since v0.1.1 统计计算时长
+import multiprocessing  # since v0.1.1 多线程计算
+import time  # since v0.1.1 统计计算时长
 from typing import Callable, Generic, List, NoReturn, Optional, Tuple, TypeVar, Union
 import matplotlib.pyplot as plt
 import math
 import sys
-import os # since v0.1.1 查看CPU核心数
+import os  # since v0.1.1 查看CPU核心数
 import numpy
-from scipy.integrate import solve_ivp # since v0.1.1 ODE45
-import warnings # since v0.1.1 提醒方法过失
+from scipy.integrate import solve_ivp  # since v0.1.1 ODE45
+import warnings  # since v0.1.1 提醒方法过失
 
 # 常量
 M: float = 1.0  # 一米
@@ -459,13 +459,6 @@ class P3:
         """
         return numpy.array(self.to_list(), dtype=numpy_dtype)
 
-    def to_numpy_ndarry3_float32(self) -> numpy.ndarray:
-        """
-        点 (x,y,z) 转为 numpy 数组 [x,y,z]，并使用 32 位浮点数存储
-        这个函数一般用于 GPU 加速计算
-        """
-        return numpy.array(self.to_list(), dtype=numpy.float32)
-
     def to_p2(
             p, transformation: Callable[["P3"], P2] = lambda p3: P2(p3.x, p3.y)
     ) -> P2:
@@ -474,6 +467,15 @@ class P3:
         默认为抛弃 z 分量
         """
         return transformation(p)
+
+    def populate(self, other: 'P3') -> None:
+        """
+        将 other 的值赋到 self 中
+        since v0.1.1
+        """
+        self.x = other.x
+        self.y = other.y
+        self.z = other.z
 
 
 class LocalCoordinateSystem:
@@ -1935,6 +1937,9 @@ class RunningParticle:
     def __str__(self) -> str:
         return f"p={self.position},v={self.velocity},v0={self.speed}"
 
+    def __repr__(self) -> str:
+        return self.__str__()
+
     def to_numpy_array_data(self, numpy_dtype=numpy.float64) -> numpy.ndarray:
         """
         RunningParticle 转为 numpy_array_data
@@ -1968,6 +1973,33 @@ class RunningParticle:
             e=numpy_array[7],
             speed=numpy_array[8],
             distance=numpy_array[9]
+        )
+
+    def populate(self, other: 'RunningParticle') -> None:
+        """
+        将 other 的值赋到 self 中
+        since v0.1.1
+        """
+        self.position.populate(other.position)
+        self.velocity.populate(other.velocity)
+        self.relativistic_mass = other.relativistic_mass
+        self.e = other.e
+        self.speed = other.speed
+        self.distance = other.distance
+
+    def __sub__(self, other: 'RunningParticle') -> "RunningParticle":
+        """
+        粒子"减法" 只用来显示两个粒子的差异
+        一般用于 debug
+        since v0.1.1
+        """
+        return RunningParticle(
+            position=self.position - other.position,
+            velocity=self.velocity - other.velocity,
+            relativistic_mass=self.relativistic_mass - other.relativistic_mass,
+            e=self.e - other.e,
+            speed=self.speed - other.speed,
+            distance=self.distance - other.distance,
         )
 
 
@@ -2830,21 +2862,21 @@ class CCT(Magnet, ApertureObject):
         )
 
         # CCT 路径的在 ξ-φ 坐标的表示 函数 φ(ξ)
-        self.phi_ksi_function = lambda ksi: self.__phi_ksi_function(ksi)
+        def phi_ksi_function(ksi): return self.__phi_ksi_function(ksi)
 
         # CCT 路径的在 ξ-φ 坐标的表示 函数 P(ξ)=(ξ,φ(ξ))
-        self.p2_function = lambda ksi: P2(ksi, self.phi_ksi_function(ksi))
+        def p2_function(ksi): return P2(ksi, phi_ksi_function(ksi))
 
         # CCT 路径的在 xyz 坐标的表示 函数 P(ξ)=P(x(ξ),y(ξ),z(ξ))
-        self.p3_function = lambda ksi: self.bipolar_toroidal_coordinate_system.convert(
-            self.p2_function(ksi)
+        def p3_function(ksi): return self.bipolar_toroidal_coordinate_system.convert(
+            p2_function(ksi)
         )
 
         # 总匝数
         self.total_disperse_number = self.winding_number * self.disperse_number_per_winding
 
         dispersed_path2: List[List[float]] = [
-            self.p2_function(ksi).to_list()
+            p2_function(ksi).to_list()
             for ksi in BaseUtils.linspace(
                 self.starting_point_in_ksi_phi_coordinate.x,
                 self.end_point_in_ksi_phi_coordinate.x,
@@ -2853,7 +2885,7 @@ class CCT(Magnet, ApertureObject):
         ]
 
         self.dispersed_path3_points: List[P3] = [
-            self.p3_function(ksi)
+            p3_function(ksi)
             for ksi in BaseUtils.linspace(
                 self.starting_point_in_ksi_phi_coordinate.x,
                 self.end_point_in_ksi_phi_coordinate.x,
@@ -3149,11 +3181,14 @@ class CCT(Magnet, ApertureObject):
         global_path3_numpy_array = numpy.array(
             [p.to_list() for p in global_path3], dtype=numpy_dtype)
 
+        global_current_elements = 1e-7 * self.current * \
+            (global_path3_numpy_array[1:] - global_path3_numpy_array[:-1])
+
+        global_elementary_current_positions = 0.5 * \
+            (global_path3_numpy_array[1:] + global_path3_numpy_array[:-1])
         return (
-            1e-7 * self.current *
-            (global_path3_numpy_array[1:] - global_path3_numpy_array[:-1]),
-            0.5 * (global_path3_numpy_array[1:] +
-                   global_path3_numpy_array[:-1])
+            global_current_elements.flatten(),
+            global_elementary_current_positions.flatten()
         )
 
 
@@ -3412,7 +3447,7 @@ class Beamline(Line2, Magnet, ApertureObject):
             kinetic_MeV: float,
             s: float = 0.0,
             length: Optional[float] = None,
-            footstep: float = 1 * MM,
+            footstep: float = 10 * MM,
             concurrency_level: int = 1
     ) -> Tuple[List[P2], List[P2]]:
         """
@@ -3859,6 +3894,9 @@ class Beamline(Line2, Magnet, ApertureObject):
 
         return self
 
+    def __str__(self) -> str:
+        return f"beamline(magnet_size={len(self.magnets)}, traj_len={self.trajectory.get_length()})"
+
 
 class BaseUtils:
     """
@@ -4238,6 +4276,33 @@ class BaseUtils:
 
             return points
 
+    class Statistic:
+        """
+        统计器
+        since v0.1.1
+        """
+
+        def __init__(self):
+            self.__data: List[float] = []
+
+        def add(self, val: float):
+            self.__data.append(val)
+
+        def max(self):
+            return numpy.max(self.__data)
+
+        def min(self):
+            return numpy.min(self.__data)
+
+        def var(self):
+            return numpy.var(self.__data)
+
+        def average(self):
+            return sum(self.__data) / len(self.__data)
+
+        def clear(self):
+            self.__data: List[float] = []
+
 
 class Plot3:
     INIT: bool = False  # 是否初始化
@@ -4531,6 +4596,8 @@ class Plot2:
                 Plot2.plot_beamline(param1, describes=["k-", "r-"])
             elif isinstance(param1, Line2):
                 Plot2.plot_line2(param1, describe=describe)
+            else:
+                print(f"无法绘制{data}")
 
         elif param_length == 2:
             param1 = data[0]
@@ -4541,8 +4608,8 @@ class Plot2:
                 Plot2.plot_xy(param1, param2, describe=describe)
             elif isinstance(param1, List) and isinstance(param2, List):
                 Plot2.plot_xy_array(param1, param2, describe=describe)
-
-            pass
+            else:
+                print(f"无法绘制{data}")
         else:
             print(f"无法绘制{data}")
 
@@ -4669,7 +4736,7 @@ class Plot2:
 
         Plot2.plot_p2s([left_points[0], right_points[0]], describe=describe)
         Plot2.plot_p2s([left_points[-1], right_points[-1]], describe=describe)
-    
+
     @staticmethod
     def plot_qs(qs: QS, describe="r-") -> None:
         """
@@ -4782,177 +4849,380 @@ class Plot2:
 
 
 class HUST_SC_GANTRY:
-    # ------------------ 前偏转段 ---------------#
-    # 漂移段
-    DL1 = 0.8001322
-    GAP1 = 0.1765959
-    GAP2 = 0.2960518
-    # qs 磁铁
-    qs1_length = 0.2997797
-    qs1_aperture_radius = 30 * MM
-    qs1_gradient = 28.33
-    qs1_second_gradient = -140.44 * 2.0
-    qs2_length = 0.2585548
-    qs2_aperture_radius = 30 * MM
-    qs2_gradient = -12.12
-    qs2_second_gradient = 316.22 * 2.0
-    # cct 偏转半径
-    cct12_big_r = 0.95
-    # cct 孔径
-    agcct12_inner_small_r = 35 * MM
-    agcct12_outer_small_r = 35 * MM
-    dicct12_inner_small_r = 35 * MM
-    dicct12_outer_small_r = 35 * MM
-    # cct 匝数
-    agcct1_winding_number = 30
-    agcct2_winding_number = 39
-    dicct12_winding_number = 71
-    # cct 角度
-    dicct12_bending_angle = 22.5
-    agcct1_bending_angle = 9.782608695652174
-    agcct2_bending_angle = 12.717391304347826
-    # cct 倾斜角（倾角 90 度表示不倾斜）
-    dicct12_tilt_angles = [30, 80]
-    agcct12_tilt_angles = [90, 30]
-    # cct 电流
-    dicct12_current = -6192
-    agcct12_current = -3319
-    # ------------------ 后偏转段 ---------------#
-    # 漂移段
-    DL2 = 2.1162209
-    GAP3 = 0.1978111
-    # qs 磁铁
-    qs3_length = 0.2382791
-    qs3_aperture_radius = 60 * MM
-    qs3_gradient = -7.3733
-    qs3_second_gradient = -45.31 * 2
-    # cct 偏转半径
-    cct345_big_r = 0.95
-    # cct 孔径
-    agcct345_inner_small_r = 83 * MM
-    agcct345_outer_small_r = 83 * MM + 15 * MM
-    dicct345_inner_small_r = 83 * MM + 15 * MM * 2
-    dicct345_outer_small_r = 83 * MM + 15 * MM * 3
-    # cct 匝数
-    agcct3_winding_number = 21
-    agcct4_winding_number = 50
-    agcct5_winding_number = 50
-    dicct345_winding_number = 128
-    # cct 角度（负数表示顺时针偏转）
-    dicct345_bending_angle = -67.5
-    agcct3_bending_angle = -(8 + 3.716404)
-    agcct4_bending_angle = -(8 + 19.93897)
-    agcct5_bending_angle = -(8 + 19.844626)
-    # cct 倾斜角（倾角 90 度表示不倾斜）
-    dicct345_tilt_angles = [30, 80]
-    agcct345_tilt_angles = [90, 30]
-    # cct 电流
-    dicct345_current = 9664
-    agcct345_current = -6000
+    def __init__(
+        self,
+        # ------------------ 前偏转段 ---------------#
+        # 漂移段
+        DL1=0.8001322,
+        GAP1=0.1765959,
+        GAP2=0.2960518,
+        # qs 磁铁
+        qs1_length=0.2997797,
+        qs1_aperture_radius=30 * MM,
+        qs1_gradient=28.33,
+        qs1_second_gradient=-140.44 * 2.0,
+        qs2_length=0.2585548,
+        qs2_aperture_radius=30 * MM,
+        qs2_gradient=-12.12,
+        qs2_second_gradient=316.22 * 2.0,
+        # cct 偏转半径
+        cct12_big_r=0.95,
+        # cct 孔径
+        agcct12_inner_small_r=35 * MM,
+        agcct12_outer_small_r=35 * MM,
+        dicct12_inner_small_r=35 * MM,
+        dicct12_outer_small_r=35 * MM,
+        # cct 匝数
+        agcct1_winding_number=30,
+        agcct2_winding_number=39,
+        dicct12_winding_number=71,
+        # cct 角度
+        dicct12_bending_angle=22.5,
+        agcct1_bending_angle=9.782608695652174,
+        agcct2_bending_angle=12.717391304347826,
+        # cct 倾斜角（倾角 90 度表示不倾斜）
+        dicct12_tilt_angles=[30, 80],
+        agcct12_tilt_angles=[90, 30],
+        # cct 电流
+        dicct12_current=-6192,
+        agcct12_current=-3319,
+        # ------------------ 后偏转段 ---------------#
+        # 漂移段
+        DL2=2.1162209,
+        GAP3=0.1978111,
+        # qs 磁铁
+        qs3_length=0.2382791,
+        qs3_aperture_radius=60 * MM,
+        qs3_gradient=-7.3733,
+        qs3_second_gradient=-45.31 * 2,
+        # cct 偏转半径
+        cct345_big_r=0.95,
+        # cct 孔径
+        agcct345_inner_small_r=83 * MM,
+        agcct345_outer_small_r=83 * MM + 15 * MM,
+        dicct345_inner_small_r=83 * MM + 15 * MM * 2,
+        dicct345_outer_small_r=83 * MM + 15 * MM * 3,
+        # cct 匝数
+        agcct3_winding_number=21,
+        agcct4_winding_number=50,
+        agcct5_winding_number=50,
+        dicct345_winding_number=128,
+        # cct 角度（负数表示顺时针偏转）
+        dicct345_bending_angle=-67.5,
+        agcct3_bending_angle=-(8 + 3.716404),
+        agcct4_bending_angle=-(8 + 19.93897),
+        agcct5_bending_angle=-(8 + 19.844626),
+        # cct 倾斜角（倾角 90 度表示不倾斜）
+        dicct345_tilt_angles=[30, 80],
+        agcct345_tilt_angles=[90, 30],
+        # cct 电流
+        dicct345_current=9664,
+        agcct345_current=-6000,
 
-    part_per_winding = 36
+        part_per_winding=120,
+    ) -> None:
+        # ------------------ 前偏转段 ---------------#
+        # 漂移段
+        self.DL1 = DL1
+        self.GAP1 = GAP1
+        self.GAP2 = GAP2
+        # qs 磁铁
+        self.qs1_length = qs1_length
+        self.qs1_aperture_radius = qs1_aperture_radius
+        self.qs1_gradient = qs1_gradient
+        self.qs1_second_gradient = qs1_second_gradient
+        self.qs2_length = qs2_length
+        self.qs2_aperture_radius = qs2_aperture_radius
+        self.qs2_gradient = qs2_gradient
+        self.qs2_second_gradient = qs2_second_gradient
+        # cct 偏转半径
+        self.cct12_big_r = cct12_big_r
+        # cct 孔径
+        self.agcct12_inner_small_r = agcct12_inner_small_r
+        self.agcct12_outer_small_r = agcct12_outer_small_r
+        self.dicct12_inner_small_r = dicct12_inner_small_r
+        self.dicct12_outer_small_r = dicct12_outer_small_r
+        # cct 匝数
+        self.agcct1_winding_number = agcct1_winding_number
+        self.agcct2_winding_number = agcct2_winding_number
+        self.dicct12_winding_number = dicct12_winding_number
+        # cct 角度
+        self.dicct12_bending_angle = dicct12_bending_angle
+        self.agcct1_bending_angle = agcct1_bending_angle
+        self.agcct2_bending_angle = agcct2_bending_angle
+        # cct 倾斜角（倾角 90 度表示不倾斜）
+        self.dicct12_tilt_angles = dicct12_tilt_angles
+        self.agcct12_tilt_angles = agcct12_tilt_angles
+        # cct 电流
+        self.dicct12_current = dicct12_current
+        self.agcct12_current = agcct12_current
+        # ------------------ 后偏转段 ---------------#
+        # 漂移段
+        self.DL2 = DL2
+        self.GAP3 = GAP3
+        # qs 磁铁
+        self.qs3_length = qs3_length
+        self.qs3_aperture_radius = qs3_aperture_radius
+        self.qs3_gradient = qs3_gradient
+        self.qs3_second_gradient = qs3_second_gradient
+        # cct 偏转半径
+        self.cct345_big_r = cct345_big_r
+        # cct 孔径
+        self.agcct345_inner_small_r = agcct345_inner_small_r
+        self.agcct345_outer_small_r = agcct345_outer_small_r
+        self.dicct345_inner_small_r = dicct345_inner_small_r
+        self.dicct345_outer_small_r = dicct345_outer_small_r
+        # cct 匝数
+        self.agcct3_winding_number = agcct3_winding_number
+        self.agcct4_winding_number = agcct4_winding_number
+        self.agcct5_winding_number = agcct5_winding_number
+        self.dicct345_winding_number = dicct345_winding_number
+        # cct 角度（负数表示顺时针偏转）
+        self.dicct345_bending_angle = dicct345_bending_angle
+        self.agcct3_bending_angle = agcct3_bending_angle
+        self.agcct4_bending_angle = agcct4_bending_angle
+        self.agcct5_bending_angle = agcct5_bending_angle
+        # cct 倾斜角（倾角 90 度表示不倾斜）
+        self.dicct345_tilt_angles = dicct345_tilt_angles
+        self.agcct345_tilt_angles = agcct345_tilt_angles
+        # cct 电流
+        self.dicct345_current = dicct345_current
+        self.agcct345_current = agcct345_current
 
-    beamline = (
-        Beamline.set_start_point(P2.origin())  # 设置束线的起点
-        # 设置束线中第一个漂移段（束线必须以漂移段开始）
-        .first_drift(direct=P2.x_direct(), length=DL1)
-        .append_agcct(  # 尾接 acgcct
-            big_r=cct12_big_r,  # 偏转半径
-            # 二极 CCT 和四极 CCT 孔径
-            small_rs=[dicct12_outer_small_r, dicct12_inner_small_r,
-                      agcct12_outer_small_r, agcct12_inner_small_r],
-            bending_angles=[agcct1_bending_angle,
-                            agcct2_bending_angle],  # agcct 每段偏转角度
-            tilt_angles=[dicct12_tilt_angles,
-                         agcct12_tilt_angles],  # 二极 CCT 和四极 CCT 倾斜角
-            winding_numbers=[[dicct12_winding_number], [
-                agcct1_winding_number, agcct2_winding_number]],  # 二极 CCT 和四极 CCT 匝数
-            currents=[dicct12_current, agcct12_current],  # 二极 CCT 和四极 CCT 电流
-            disperse_number_per_winding=part_per_winding  # 每匝分段数目
-        )
-        .append_drift(GAP1)  # 尾接漂移段
-        .append_qs(  # 尾接 QS 磁铁
-            length=qs1_length,
-            gradient=qs1_gradient,
-            second_gradient=qs1_second_gradient,
-            aperture_radius=qs1_aperture_radius
-        )
-        .append_drift(GAP2)
-        .append_qs(
-            length=qs2_length,
-            gradient=qs2_gradient,
-            second_gradient=qs2_second_gradient,
-            aperture_radius=qs2_aperture_radius
-        )
-        .append_drift(GAP2)
-        .append_qs(
-            length=qs1_length,
-            gradient=qs1_gradient,
-            second_gradient=qs1_second_gradient,
-            aperture_radius=qs1_aperture_radius
-        )
-        .append_drift(GAP1)
-        .append_agcct(
-            big_r=cct12_big_r,
-            small_rs=[dicct12_outer_small_r, dicct12_inner_small_r,
-                      agcct12_outer_small_r, agcct12_inner_small_r],
-            bending_angles=[agcct2_bending_angle, agcct1_bending_angle],
-            tilt_angles=[dicct12_tilt_angles, agcct12_tilt_angles],
-            winding_numbers=[[dicct12_winding_number], [
-                agcct2_winding_number, agcct1_winding_number]],
-            currents=[dicct12_current, agcct12_current],
-            disperse_number_per_winding=part_per_winding
-        )
-        .append_drift(DL1)
-    )
+        self.part_per_winding = part_per_winding
 
-    # 束线长度
-    beamline_length_part1 = beamline.get_length()
+        # -------- make ---------
+        self.__beamline = None
+        self.__first_bending_part_length = None
 
-    beamline = (
-        beamline.append_drift(DL2)
-        .append_agcct(
-            big_r=cct345_big_r,
-            small_rs=[dicct345_outer_small_r, dicct345_inner_small_r,
-                      agcct345_outer_small_r, agcct345_inner_small_r],
-            bending_angles=[agcct3_bending_angle,
-                            agcct4_bending_angle, agcct5_bending_angle],
-            tilt_angles=[dicct345_tilt_angles, agcct345_tilt_angles],
-            winding_numbers=[[dicct345_winding_number], [
-                agcct3_winding_number, agcct4_winding_number, agcct5_winding_number]],
-            currents=[dicct345_current, agcct345_current],
-            disperse_number_per_winding=part_per_winding
+    def create_beamline(self):
+        if self.__beamline is None:
+            self.__beamline = (
+                Beamline.set_start_point(P2.origin())  # 设置束线的起点
+                # 设置束线中第一个漂移段（束线必须以漂移段开始）
+                .first_drift(direct=P2.x_direct(), length=self.DL1)
+                .append_agcct(  # 尾接 acgcct
+                    big_r=self.cct12_big_r,  # 偏转半径
+                    # 二极 CCT 和四极 CCT 孔径
+                    small_rs=[self.dicct12_outer_small_r, self.dicct12_inner_small_r,
+                              self.agcct12_outer_small_r, self.agcct12_inner_small_r],
+                    bending_angles=[self.agcct1_bending_angle,
+                                    self.agcct2_bending_angle],  # agcct 每段偏转角度
+                    tilt_angles=[self.dicct12_tilt_angles,
+                                 self.agcct12_tilt_angles],  # 二极 CCT 和四极 CCT 倾斜角
+                    winding_numbers=[[self.dicct12_winding_number], [
+                        self.agcct1_winding_number, self.agcct2_winding_number]],  # 二极 CCT 和四极 CCT 匝数
+                    # 二极 CCT 和四极 CCT 电流
+                    currents=[self.dicct12_current, self.agcct12_current],
+                    disperse_number_per_winding=self.part_per_winding  # 每匝分段数目
+                )
+                .append_drift(self.GAP1)  # 尾接漂移段
+                .append_qs(  # 尾接 QS 磁铁
+                    length=self.qs1_length,
+                    gradient=self.qs1_gradient,
+                    second_gradient=self.qs1_second_gradient,
+                    aperture_radius=self.qs1_aperture_radius
+                )
+                .append_drift(self.GAP2)
+                .append_qs(
+                    length=self.qs2_length,
+                    gradient=self.qs2_gradient,
+                    second_gradient=self.qs2_second_gradient,
+                    aperture_radius=self.qs2_aperture_radius
+                )
+                .append_drift(self.GAP2)
+                .append_qs(
+                    length=self.qs1_length,
+                    gradient=self.qs1_gradient,
+                    second_gradient=self.qs1_second_gradient,
+                    aperture_radius=self.qs1_aperture_radius
+                )
+                .append_drift(self.GAP1)
+                .append_agcct(
+                    big_r=self.cct12_big_r,
+                    small_rs=[self.dicct12_outer_small_r, self.dicct12_inner_small_r,
+                              self.agcct12_outer_small_r, self.agcct12_inner_small_r],
+                    bending_angles=[self.agcct2_bending_angle,
+                                    self.agcct1_bending_angle],
+                    tilt_angles=[self.dicct12_tilt_angles,
+                                 self.agcct12_tilt_angles],
+                    winding_numbers=[[self.dicct12_winding_number], [
+                        self.agcct2_winding_number, self.agcct1_winding_number]],
+                    currents=[self.dicct12_current, self.agcct12_current],
+                    disperse_number_per_winding=self.part_per_winding
+                )
+                .append_drift(self.DL1)
+            )
+
+            # 把偏转段的磁铁都删了
+            self.__beamline.magnets.clear()
+
+            self.__first_bending_part_length = self.__beamline.get_length()
+
+            self.__beamline = (
+                self.__beamline.append_drift(self.DL2)
+                .append_agcct(
+                    big_r=self.cct345_big_r,
+                    small_rs=[self.dicct345_outer_small_r, self.dicct345_inner_small_r,
+                              self.agcct345_outer_small_r, self.agcct345_inner_small_r],
+                    bending_angles=[self.agcct3_bending_angle,
+                                    self.agcct4_bending_angle, self.agcct5_bending_angle],
+                    tilt_angles=[self.dicct345_tilt_angles,
+                                 self.agcct345_tilt_angles],
+                    winding_numbers=[[self.dicct345_winding_number], [
+                        self.agcct3_winding_number, self.agcct4_winding_number, self.agcct5_winding_number]],
+                    currents=[self.dicct345_current, self.agcct345_current],
+                    disperse_number_per_winding=self.part_per_winding
+                )
+                .append_drift(self.GAP3)
+                .append_qs(
+                    length=self.qs3_length,
+                    gradient=self.qs3_gradient,
+                    second_gradient=self.qs3_second_gradient,
+                    aperture_radius=self.qs3_aperture_radius
+                )
+                .append_drift(self.GAP3)
+                .append_agcct(
+                    big_r=self.cct345_big_r,
+                    small_rs=[self.dicct345_outer_small_r, self.dicct345_inner_small_r,
+                              self.agcct345_outer_small_r, self.agcct345_inner_small_r],
+                    bending_angles=[self.agcct5_bending_angle,
+                                    self.agcct4_bending_angle, self.agcct3_bending_angle],
+                    tilt_angles=[self.dicct345_tilt_angles,
+                                 self.agcct345_tilt_angles],
+                    winding_numbers=[[self.dicct345_winding_number], [
+                        self.agcct5_winding_number, self.agcct4_winding_number, self.agcct3_winding_number]],
+                    currents=[self.dicct345_current, self.agcct345_current],
+                    disperse_number_per_winding=self.part_per_winding
+                )
+                .append_drift(self.DL2)
+            )
+
+        return self.__beamline
+
+    def first_bending_part_length(self):
+        if self.__beamline is None:
+            self.beamline()
+
+        return self.__first_bending_part_length
+
+    def create_second_bending_part(self, start_point: P2, start_driect: P2) -> Beamline:
+        return (
+            Beamline.set_start_point(start_point)  # 设置束线的起点
+            # 设置束线中第一个漂移段（束线必须以漂移段开始）
+            .first_drift(direct=start_driect, length=self.DL2)
+            .append_agcct(
+                big_r=self.cct345_big_r,
+                small_rs=[self.dicct345_outer_small_r, self.dicct345_inner_small_r,
+                          self.agcct345_outer_small_r, self.agcct345_inner_small_r],
+                bending_angles=[self.agcct3_bending_angle,
+                                self.agcct4_bending_angle, self.agcct5_bending_angle],
+                tilt_angles=[self.dicct345_tilt_angles,
+                             self.agcct345_tilt_angles],
+                winding_numbers=[[self.dicct345_winding_number], [
+                    self.agcct3_winding_number, self.agcct4_winding_number, self.agcct5_winding_number]],
+                currents=[self.dicct345_current, self.agcct345_current],
+                disperse_number_per_winding=self.part_per_winding
+            )
+            .append_drift(self.GAP3)
+            .append_qs(
+                length=self.qs3_length,
+                gradient=self.qs3_gradient,
+                second_gradient=self.qs3_second_gradient,
+                aperture_radius=self.qs3_aperture_radius
+            )
+            .append_drift(self.GAP3)
+            .append_agcct(
+                big_r=self.cct345_big_r,
+                small_rs=[self.dicct345_outer_small_r, self.dicct345_inner_small_r,
+                          self.agcct345_outer_small_r, self.agcct345_inner_small_r],
+                bending_angles=[self.agcct5_bending_angle,
+                                self.agcct4_bending_angle, self.agcct3_bending_angle],
+                tilt_angles=[self.dicct345_tilt_angles,
+                             self.agcct345_tilt_angles],
+                winding_numbers=[[self.dicct345_winding_number], [
+                    self.agcct5_winding_number, self.agcct4_winding_number, self.agcct3_winding_number]],
+                currents=[self.dicct345_current, self.agcct345_current],
+                disperse_number_per_winding=self.part_per_winding
+            )
+            .append_drift(self.DL2)
         )
-        .append_drift(GAP3)
-        .append_qs(
-            length=qs3_length,
-            gradient=qs3_gradient,
-            second_gradient=qs3_second_gradient,
-            aperture_radius=qs3_aperture_radius
+
+
+def beamline_phase_ellipse_multi_delta(bl: Beamline, particle_number: int,
+                                       dps: List[float], describles: str = ['r.', 'y.', 'b.', 'k.', 'g.', 'c.', 'm.']):
+    if len(dps) > len(describles):
+        raise ValueError(
+            f'describles(size={len(describles)}) 长度应大于 dps(size={len(dps)})')
+    xs = []
+    ys = []
+    for dp in dps:
+        x, y = bl.track_phase_ellipse(
+            x_sigma_mm=3.5, xp_sigma_mrad=7.5,
+            y_sigma_mm=3.5, yp_sigma_mrad=7.5,
+            delta=dp, particle_number=particle_number,
+            kinetic_MeV=215, concurrency_level=16,
+            footstep=10*MM
         )
-        .append_drift(GAP3)
-        .append_agcct(
-            big_r=cct345_big_r,
-            small_rs=[dicct345_outer_small_r, dicct345_inner_small_r,
-                      agcct345_outer_small_r, agcct345_inner_small_r],
-            bending_angles=[agcct5_bending_angle,
-                            agcct4_bending_angle, agcct3_bending_angle],
-            tilt_angles=[dicct345_tilt_angles, agcct345_tilt_angles],
-            winding_numbers=[[dicct345_winding_number], [
-                agcct5_winding_number, agcct4_winding_number, agcct3_winding_number]],
-            currents=[dicct345_current, agcct345_current],
-            disperse_number_per_winding=part_per_winding
-        )
-        .append_drift(DL2)
-    )
+        xs.append(x)
+        ys.append(y)
+
+    plt.subplot(121)
+
+    for i in range(len(dps)):
+        plt.plot(*P2.extract(xs[i]), describles[i])
+    plt.xlabel(xlabel='x/mm')
+    plt.ylabel(ylabel='xp/mr')
+    plt.title(label='x-plane')
+    plt.legend(['dp'+str(int(dp*100)) for dp in dps])
+    plt.axis("equal")
+
+    plt.subplot(122)
+    for i in range(len(dps)):
+        plt.plot(*P2.extract(ys[i]), describles[i])
+    plt.xlabel(xlabel='y/mm')
+    plt.ylabel(ylabel='yp/mr')
+    plt.title(label='y-plane')
+    plt.legend(['dp'+str(int(dp*100)) for dp in dps])
+    plt.axis("equal")
+
+    plt.show()
 
 
 if __name__ == "__main__":
-    bl = HUST_SC_GANTRY.beamline
+    BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
+    # -9.30E-01	-3.48E+01	
+    # 7.80E+01	1.01E+02	8.58E+01	
+    # 1.07E+02	7.02E+01	8.43E+01	
+    # 9.16E+03	-5.75E+03	
+    # 2.20E+01	4.90E+01	4.70E+01
 
-    cct: CCT = bl.magnets[15]
+    # 1.57E+00 -5.59E+01
+    # 8.57E+01	8.39E+01	9.80E+01	
+    # 9.71E+01 8.65E+01	9.02E+01
+    # 9.21E+03 -6.11E+03
+    # 2.10E+01	4.70E+01	5.20E+01
 
-    p = bl.trajectory.point_at(HUST_SC_GANTRY.beamline_length_part1 +
-                               HUST_SC_GANTRY.DL2+0.5).to_p3() + P3(1E-3, 1E-4, 1E-5)
+    gantry = HUST_SC_GANTRY(
+        qs3_gradient=1.57E+00,
+        qs3_second_gradient=-5.59E+01,
+        dicct345_tilt_angles=[30, 8.57E+01, 8.39E+01, 9.80E+01],
+        agcct345_tilt_angles=[9.71E+01, 30, 8.65E+01, 9.02E+01],
+        dicct345_current=9.21E+03,
+        agcct345_current=-6.11E+03	,
+        agcct3_winding_number=21,
+        agcct4_winding_number=47,
+        agcct5_winding_number=52,
+    )
+    bl_all = gantry.create_beamline()
 
-    print(cct.magnetic_field_at(p))
+    f = gantry.first_bending_part_length()
+
+    sp = bl_all.trajectory.point_at(f)
+    sd = bl_all.trajectory.direct_at(f)
+
+    bl = gantry.create_second_bending_part(sp, sd)
+
+    beamline_phase_ellipse_multi_delta(
+        bl,8,[-0.05,0,0.05]
+    )

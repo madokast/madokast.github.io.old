@@ -1,9 +1,11 @@
-try:
-    from books.cct.cctpy.cctpy import *
-except ModuleNotFoundError:
-    pass
+# try:
+#     from books.cct.cctpy.cctpy import *
+# except ModuleNotFoundError:
+#     pass
 
-from cctpy import *
+# from cctpy import *
+
+# 2020年12月8日 代码作废
 
 GPU_ON: bool = True
 
