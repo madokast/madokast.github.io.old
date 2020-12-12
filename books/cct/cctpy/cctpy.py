@@ -5150,7 +5150,7 @@ class HUST_SC_GANTRY:
 
 
 def beamline_phase_ellipse_multi_delta(bl: Beamline, particle_number: int,
-                                       dps: List[float], describles: str = ['r.', 'y.', 'b.', 'k.', 'g.', 'c.', 'm.']):
+                                       dps: List[float], describles: str = ['r-', 'y-', 'b-', 'k-', 'g-', 'c-', 'm-']):
     if len(dps) > len(describles):
         raise ValueError(
             f'describles(size={len(describles)}) 长度应大于 dps(size={len(dps)})')
@@ -5162,10 +5162,10 @@ def beamline_phase_ellipse_multi_delta(bl: Beamline, particle_number: int,
             y_sigma_mm=3.5, yp_sigma_mrad=7.5,
             delta=dp, particle_number=particle_number,
             kinetic_MeV=215, concurrency_level=16,
-            footstep=10*MM
+            footstep=20*MM
         )
-        xs.append(x)
-        ys.append(y)
+        xs.append(x + [x[0]])
+        ys.append(y + [y[0]])
 
     plt.subplot(121)
 
@@ -5191,28 +5191,17 @@ def beamline_phase_ellipse_multi_delta(bl: Beamline, particle_number: int,
 
 if __name__ == "__main__":
     BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
-    # -9.30E-01	-3.48E+01	
-    # 7.80E+01	1.01E+02	8.58E+01	
-    # 1.07E+02	7.02E+01	8.43E+01	
-    # 9.16E+03	-5.75E+03	
-    # 2.20E+01	4.90E+01	4.70E+01
-
-    # 1.57E+00 -5.59E+01
-    # 8.57E+01	8.39E+01	9.80E+01	
-    # 9.71E+01 8.65E+01	9.02E+01
-    # 9.21E+03 -6.11E+03
-    # 2.10E+01	4.70E+01	5.20E+01
 
     gantry = HUST_SC_GANTRY(
-        qs3_gradient=1.57E+00,
-        qs3_second_gradient=-5.59E+01,
-        dicct345_tilt_angles=[30, 8.57E+01, 8.39E+01, 9.80E+01],
-        agcct345_tilt_angles=[9.71E+01, 30, 8.65E+01, 9.02E+01],
-        dicct345_current=9.21E+03,
-        agcct345_current=-6.11E+03	,
-        agcct3_winding_number=21,
-        agcct4_winding_number=47,
-        agcct5_winding_number=52,
+        qs3_gradient=-1.07E+00,
+        qs3_second_gradient=-9.55E+01,
+        dicct345_tilt_angles=[30, 76.6, 92.7, 87],
+        agcct345_tilt_angles=[105, 30, 75.6, 96.3],
+        dicct345_current=9140,
+        agcct345_current=-5320	,
+        agcct3_winding_number=19,
+        agcct4_winding_number=55,
+        agcct5_winding_number=53,
     )
     bl_all = gantry.create_beamline()
 
@@ -5224,5 +5213,5 @@ if __name__ == "__main__":
     bl = gantry.create_second_bending_part(sp, sd)
 
     beamline_phase_ellipse_multi_delta(
-        bl,8,[-0.05,0,0.05]
+        bl, 8, [-0.05, -0.025, 0, +0.025, 0.05]
     )

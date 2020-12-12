@@ -30,3 +30,31 @@ new String("abc")
 
 利用 finalize 来释放资源是不对的，因为资源宝贵，而 finalize 方法不知何时才会运行
 
+## 9 优先使用 try-with-rource
+
+这是为了代替 try-finally。很多资源需要关闭，如果资源使用中出现异常，很可能进入 finally 中的 close() 方法也会出现异常，这样就覆盖了前面的异常，导致排查困难。
+
+
+# 对象的通用方法
+
+## 10 覆盖 equals 方法的约定
+
+- 添加了成员 field 的继承和 equals 方法存在本质的冲突？对的
+
+## 11 覆盖 equals 时总要覆盖 hashCode
+
+## 12 始终覆盖 toString
+
+## 13 谨慎使用 clone
+
+- Cloneable 接口的作用是什么？
+
+答：改变父类 clone 方法的行为，如果子类没有实现 Cloneable，super.clone 抛出异常
+
+- 数组实现了 clone 方法？对的
+
+- 比 colne 更好的是使用拷贝构造器
+
+## 14 考虑实现 comparable 接口
+
+- 比较大小时，考虑使用 Type.compare() 更好？对的

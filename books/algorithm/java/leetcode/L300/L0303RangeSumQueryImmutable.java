@@ -28,10 +28,6 @@ public class L0303RangeSumQueryImmutable {
 
     }
 
-    private static void test() {
-
-    }
-
 }
 
 class NumArray {
