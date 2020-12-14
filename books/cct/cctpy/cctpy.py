@@ -499,8 +499,9 @@ class LocalCoordinateSystem:
         z_direction 局部坐标系 z 方向，默认全局坐标系 z 方向
         """
         BaseUtils.equal(
-            x_direction * z_direction,
+            x_direction.copy().normalize() * z_direction.copy().normalize(),
             0.0,
+            err=1e-4,
             msg=f"创建 LocalCoordinateSystem 对象异常，x_direction{x_direction}和z_direction{z_direction}不正交",
         )
 
@@ -2872,6 +2873,10 @@ class CCT(Magnet, ApertureObject):
             p2_function(ksi)
         )
 
+        self.phi_ksi_function = phi_ksi_function
+        self.p2_function = p2_function
+        self.p3_function = p3_function
+
         # 总匝数
         self.total_disperse_number = self.winding_number * self.disperse_number_per_winding
 
@@ -2903,6 +2908,10 @@ class CCT(Magnet, ApertureObject):
 
         # 电流元 (miu0/4pi) * current * (p[i+1] - p[i])
         # refactor v0.1.1
+        # 语法分析：示例
+        # a = array([1, 2, 3, 4])
+        # a[1:] = array([2, 3, 4])
+        # a[:-1] = array([1, 2, 3])
         self.elementary_current = 1e-7 * current * (
             self.dispersed_path3[1:] - self.dispersed_path3[:-1]
         )
@@ -2997,6 +3006,9 @@ class CCT(Magnet, ApertureObject):
         计算 CCT 在全局坐标系点 P3 参数的磁场
         为了计算效率，使用 numpy
         """
+        if BaseUtils.equal(self.current, 0, err=1e-6):
+            return P3.zeros()
+
         # point 转为局部坐标，并变成 numpy 向量
         p = numpy.array(
             self.local_coordinate_system.point_to_local_coordinate(

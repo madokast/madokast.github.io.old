@@ -21,11 +21,6 @@ import sys
 from scipy.optimize.optimize import main
 from cctpy import *
 
-try:
-    from books.cct.cctpy.cctpy import *
-except ModuleNotFoundError:
-    pass
-
 
 class GPU_ACCELERATOR:
     FLOAT32: str = "FLOAT32"
