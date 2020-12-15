@@ -2863,7 +2863,7 @@ class CCT(Magnet, ApertureObject):
         )
 
         # CCT 路径的在 ξ-φ 坐标的表示 函数 φ(ξ)
-        def phi_ksi_function(ksi): return self.__phi_ksi_function(ksi)
+        def phi_ksi_function(ksi): return self.phi_ksi_function(ksi)
 
         # CCT 路径的在 ξ-φ 坐标的表示 函数 P(ξ)=(ξ,φ(ξ))
         def p2_function(ksi): return P2(ksi, phi_ksi_function(ksi))
@@ -2873,9 +2873,9 @@ class CCT(Magnet, ApertureObject):
             p2_function(ksi)
         )
 
-        self.phi_ksi_function = phi_ksi_function
-        self.p2_function = p2_function
-        self.p3_function = p3_function
+        # self.phi_ksi_function = phi_ksi_function
+        # self.p2_function = p2_function
+        # self.p3_function = p3_function
 
         # 总匝数
         self.total_disperse_number = self.winding_number * self.disperse_number_per_winding
@@ -2921,7 +2921,7 @@ class CCT(Magnet, ApertureObject):
             self.dispersed_path3[1:] + self.dispersed_path3[:-1]
         )
 
-    def __phi_ksi_function(self, ksi: float) -> float:
+    def phi_ksi_function(self, ksi: float) -> float:
         """
         返回一个函数，完成 ξ 到 φ 的映射
         """
@@ -3202,6 +3202,14 @@ class CCT(Magnet, ApertureObject):
             global_current_elements.flatten(),
             global_elementary_current_positions.flatten()
         )
+    
+    def p2_function(self,ksi):
+        """
+        二维坐标系点 (ksi, phi)
+
+        since v0.1.1
+        """
+        return P2(ksi,self.phi_ksi_function(ksi))
 
 
 class QS(Magnet, ApertureObject):
@@ -3731,6 +3739,15 @@ class Beamline(Line2, Magnet, ApertureObject):
         winding_numbers: List[List[int]], 二极 CCT 和四极 CCT 的匝数，典型值 [[128],[21,50,50]] 表示二极 CCT 128匝，四极交变 CCT 为 21、50、50 匝
         currents: List[float] 二极 CCT 和四极 CCT 的电流，典型值 [8000,9000]
         disperse_number_per_winding: int 每匝分段数目，越大计算越精确
+
+        添加 CCT 的顺序为：
+        外层二极 CCT
+        内层二极 CCT
+        part1 四极 CCT 内层
+        part1 四极 CCT 外层
+        part2 四极 CCT 内层
+        part2 四极 CCT 外层
+        ... ... 
         """
         if len(small_rs) != 4:
             raise ValueError(

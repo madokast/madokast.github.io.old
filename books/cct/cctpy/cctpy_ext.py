@@ -19,12 +19,26 @@ class Magnets(Magnet):
     def __init__(self, *magnet) -> None:
         self.magnets: List[Magnet] = list(magnet)
 
+    def add(self, magnet: Magnet) -> 'Magnets':
+        self.magnets.append(magnet)
+        return self
+
+    def remove(self,  magnet: Magnet) -> 'Magnets':
+        self.magnets.remove(magnet)
+        return self
+
     def magnetic_field_at(self, point: P3) -> P3:
         b = P3()
         for m in self.magnets:
             b += m.magnetic_field_at(point)
 
         return b
+
+    def __str__(self) -> str:
+        return f"Magnets: 共有 {len(self.magnets)} 个磁铁"
+
+    def __repr__(self) -> str:
+        return self.__str__()
 
 
 class Line3:
@@ -115,10 +129,10 @@ class Wire(Magnet):
         """
         计算磁场，全局坐标
         """
-        if BaseUtils.equal(self.current,0,err=1e-6):
+        if BaseUtils.equal(self.current, 0, err=1e-6):
             return P3.zeros()
-        
-        if BaseUtils.equal(self.line3.start,self.line3.end,err=1e-6):
+
+        if BaseUtils.equal(self.line3.start, self.line3.end, err=1e-6):
             return P3.zeros()
 
         p = point.to_numpy_ndarry3()
@@ -205,9 +219,14 @@ class Wire(Magnet):
         """
         由 CCT 创建 wire
         """
+        def p3f(ksi):
+            return cct.bipolar_toroidal_coordinate_system.convert(
+                P2(ksi, cct.phi_ksi_function(ksi))
+            )
+
         return Wire(
             line3=Line3(
-                p3_function=cct.p3_function,
+                p3_function=p3f,
                 start=cct.starting_point_in_ksi_phi_coordinate.x,
                 end=cct.end_point_in_ksi_phi_coordinate.x
             ),
@@ -215,210 +234,3 @@ class Wire(Magnet):
             delta_length=cct.small_r *
             BaseUtils.angle_to_radian(360/cct.winding_number)
         )
-
-
-#########################################
-
-R = 0.95
-rin = 113*MM
-rout = 128*MM
-tain = [30]
-taout = [150]
-wn = 128
-I = 9206
-benda = 67.5
-bendr = BaseUtils.angle_to_radian(benda)
-delta_angle = 10
-
-cct_in = CCT(
-    local_coordinate_system=LocalCoordinateSystem.global_coordinate_system(),
-    big_r=R, small_r=rin, bending_angle=benda,
-    tilt_angles=tain, winding_number=wn,
-    current=I, starting_point_in_ksi_phi_coordinate=P2.origin(),
-    end_point_in_ksi_phi_coordinate=P2(
-        wn*2*math.pi, bendr),
-    disperse_number_per_winding=36
-)
-
-cct_out = CCT(
-    local_coordinate_system=LocalCoordinateSystem.global_coordinate_system(),
-    big_r=R, small_r=rout, bending_angle=benda,
-    tilt_angles=taout, winding_number=wn,
-    current=I, starting_point_in_ksi_phi_coordinate=P2.origin(),
-    end_point_in_ksi_phi_coordinate=P2(
-        -wn*2*math.pi, bendr),
-    disperse_number_per_winding=36
-)
-
-wcct_in = Wire.create_by_cct(cct_in)
-wcct_out = Wire.create_by_cct(cct_out)
-
-# 查看内层洛伦兹力
-
-
-def task(s):
-    fon = wcct_in.lorentz_force_on_wire(
-        s=BaseUtils.angle_to_radian(s),
-        delta_length=rin * BaseUtils.angle_to_radian(delta_angle),
-        # local_coordinate_point=LocalCoordinateSystem.global_coordinate_system(),
-        local_coordinate_point=LocalCoordinateSystem(
-            location=wcct_in.line3.point_at(BaseUtils.angle_to_radian(s)),
-            x_direction=wcct_in.line3.direct_at(
-                BaseUtils.angle_to_radian(s)),
-            z_direction=cct_in.bipolar_toroidal_coordinate_system.main_normal_direction_at(
-                cct_in.p2_function(BaseUtils.angle_to_radian(s))
-            )
-        ),
-        other_magnet=cct_out
-    )
-    print(fon)
-    return fon
-
-
-if __name__ == "__main__":
-    BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
-    # 测试
-    import unittest
-
-    class Test(unittest.TestCase):
-        def test_line3(self):
-            line = Line3(lambda s: P3(s, 2*s, 0), 0, 1)
-            print(line.point_at(0.5))
-            print(line.direct_at(0.5))
-
-            self.assertEqual(line.point_at(0.5), P3(0.5, 1, 0))
-            self.assertEqual(line.direct_at(0.5), P3(1, 2, 0))
-
-        def test_cct(self):
-            r = 137*MM
-            R = 0.95
-            wn = 128
-            cct = CCT(
-                local_coordinate_system=LocalCoordinateSystem.global_coordinate_system(),
-                big_r=R, small_r=r, bending_angle=67.5, tilt_angles=[30],
-                winding_number=wn, current=9664, starting_point_in_ksi_phi_coordinate=P2(),
-                end_point_in_ksi_phi_coordinate=P2(
-                    wn*2*numpy.pi, BaseUtils.angle_to_radian(67.5)),
-                disperse_number_per_winding=120
-            )
-
-            traj = (
-                Trajectory.set_start_point(
-                    P2(R, -1)).first_line(P2.y_direct(), 1.0)
-                .add_arc_line(R, False, 67.5).add_strait_line(1.0)
-            )
-
-            # [0.743381541944373, -1.1125490995331133, 1.2364386785183252]
-            B = cct.magnetic_field_at(
-                traj.point_at(traj.get_length()/2).to_p3())
-            print('cct', B)
-            ksi = 10
-            print(cct.p3_function(ksi))
-
-        def test_wire(self):
-            small_r = 137*MM
-            big_r = 0.95
-            wn = 128
-            a = math.sqrt(big_r ** 2 - small_r ** 2)
-            eta = 0.5 * math.log((big_r + a) / (big_r - a))
-            tilt_angle = 30
-            phi0 = BaseUtils.angle_to_radian(67.5)/wn
-
-            def ksi_func(ksi):
-                cota = 1/math.tan(BaseUtils.angle_to_radian(tilt_angle))
-                return cota / math.sinh(eta) * math.sin(ksi) + phi0*ksi/(2*math.pi)
-
-            def p2_2_p3(p: P2):
-                nonlocal a, eta
-                ksi = p.x
-                phi = p.y
-                temp = a / (math.cosh(eta) - math.cos(ksi))
-                return P3(
-                    temp * math.sinh(eta) * math.cos(phi),
-                    temp * math.sinh(eta) * math.sin(phi),
-                    temp * math.sin(ksi),
-                )
-
-            wire = Wire(
-                line3=Line3(
-                    lambda ksi: p2_2_p3(P2(ksi, ksi_func(ksi))),
-                    0,
-                    wn*2*math.pi
-                ),
-                current=9664,
-                delta_length=BaseUtils.angle_to_radian(3)
-            )
-
-            traj = (
-                Trajectory.set_start_point(
-                    P2(0.95, -1)).first_line(P2.y_direct(), 1.0)
-                .add_arc_line(big_r, False, 67.5).add_strait_line(1.0)
-            )
-
-            p = traj.point_at(traj.get_length()/2).to_p3()
-
-            B = wire.magnetic_field_at(p)
-
-            print('wire', B)
-
-            ksi = 10
-            print(p2_2_p3(P2(ksi, ksi_func(ksi))))
-
-    # unittest.main(verbosity=1)
-
-    # 洛伦兹力计算
-    if False:
-
-        # ss = BaseUtils.linspace(5, 128*360-5, 128*36)
-        ss = BaseUtils.linspace(5+64*360, 360-5+64*360, 36)
-
-        fons = BaseUtils.submit_process_task(task=task, param_list=[
-            [s]
-            for s in ss])
-
-        data = []
-        for i in range(len(fons)):
-            p, f = fons[i]
-            data.append([i+1, p.x, p.y, p.z, f.x, f.y, f.z])
-
-        data = numpy.array(data)
-        Plot2.plot_ndarry2ds(data[:, (0, 4)], describe='r-')
-        Plot2.plot_ndarry2ds(data[:, (0, 5)], describe='b-')
-        Plot2.plot_ndarry2ds(data[:, (0, 6)], describe='y-')
-        Plot2.show()
-
-        # Plot3.plot_cct(cct,describe='b-')
-        # Plot3.plot_ndarry3ds(data[:,(1,2,3)],describe='r.')
-        # Plot3.plot_xyz(data[19,1],data[19,2],data[19,3],describe='k.')
-
-        # Plot3.show()
-
-    if True:
-        ss = BaseUtils.linspace(delta_angle/2, 360-delta_angle/2, 36)
-        # ss = BaseUtils.linspace(delta_angle/2, 360-delta_angle/2, 360)
-
-        BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
-        fons = BaseUtils.submit_process_task(
-            task=task, param_list=[[s] for s in ss])
-
-        data = []
-        for i in range(len(fons)):
-            p, f = fons[i]
-            data.append([i+1, p.x, p.y, p.z, f.x, f.y, f.z])
-
-        data = numpy.array(data)
-
-        # numpy.savetxt('data.txt',data)
-
-        # data = numpy.loadtxt(r'C:\Users\madoka_9900\Documents\github\madokast.github.io\data.txt')
-        
-        if True: # 画图
-            Plot2.plot_ndarry2ds(data[:, (0, 4)], describe='r-')
-            Plot2.plot_ndarry2ds(data[:, (0, 5)], describe='b-')
-            Plot2.plot_ndarry2ds(data[:, (0, 6)], describe='y-')
-
-            Plot2.legend('绕线方向', 'rib方向', '径向', font_size=18,
-                        font_family="Microsoft YaHei")
-            Plot2.info('index', 'lorentz_force/N', '双层二极CCT的内层受力',
-                    font_size=18, font_family="Microsoft YaHei")
-            Plot2.show()
