@@ -5191,7 +5191,7 @@ def beamline_phase_ellipse_multi_delta(bl: Beamline, particle_number: int,
             y_sigma_mm=3.5, yp_sigma_mrad=7.5,
             delta=dp, particle_number=particle_number,
             kinetic_MeV=215, concurrency_level=16,
-            footstep=20*MM
+            footstep=10*MM
         )
         xs.append(x + [x[0]])
         ys.append(y + [y[0]])
@@ -5222,15 +5222,18 @@ if __name__ == "__main__":
     BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
 
     gantry = HUST_SC_GANTRY(
-        qs3_gradient=-1.07E+00,
-        qs3_second_gradient=-9.55E+01,
-        dicct345_tilt_angles=[30, 76.6, 92.7, 87],
-        agcct345_tilt_angles=[105, 30, 75.6, 96.3],
-        dicct345_current=9140,
-        agcct345_current=-5320	,
-        agcct3_winding_number=19,
-        agcct4_winding_number=55,
-        agcct5_winding_number=53,
+        qs3_gradient=-8.0800,
+        qs3_second_gradient=-9.1322,
+        dicct345_tilt_angles=[30, 80.9085, 94.4910, 91.8350],
+        agcct345_tilt_angles=[107.7704 , 30, 70.7248, 89.5931],
+        dicct345_current=9517.3286,
+        agcct345_current=-7335.6473,
+        agcct3_winding_number=24,
+        agcct4_winding_number=46,
+        agcct5_winding_number=37,
+        agcct3_bending_angle = -67.5*(24)/(24+46+37),
+        agcct4_bending_angle = -67.5*(46)/(24+46+37),
+        agcct5_bending_angle = -67.5*(37)/(24+46+37)
     )
     bl_all = gantry.create_beamline()
 
