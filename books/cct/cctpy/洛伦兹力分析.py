@@ -12,9 +12,6 @@ except ModuleNotFoundError:
     pass
 
 R = 0.95
-wn = 128
-benda = 67.5
-bendr = BaseUtils.angle_to_radian(benda)
 
 bl = (
     Beamline.set_start_point(start_point=P2(R, -1))
@@ -22,23 +19,30 @@ bl = (
     .append_agcct(
         big_r=R,
         small_rs=[128*MM, 113*MM, 98*MM, 83*MM],
-        bending_angles=[13.386, 27.344, 27.770],
-        tilt_angles=[[30], [90, 30]],
-        winding_numbers=[[128], [20, 44, 44]],
-        currents=[9206, 7037],
+        bending_angles=[15.14, 29.02, 23.34],
+        tilt_angles=[[30, 80.988, 94.383, 91.650],
+                     [106.654, 30, 67.901, 90.941]],
+        winding_numbers=[[128], [24, 46, 37]],
+        currents=[9488.615, 7334.914],
         disperse_number_per_winding=36
     ).append_drift(1)
 )
 
 # 提取 CCT
-dicct_out = bl.magnets[0] # [0.0, 0.0] [-804.247719318987, 1.1955505376161157]
-dicct_in = bl.magnets[1] # [0.0, 0.0] [804.247719318987, 1.1955505376161157])
-agcct3_in = bl.magnets[2] # [0.0, 0.0] [125.66370614359172, 0.23362977367196094]
-agcct3_out = bl.magnets[3] # [0.0, 0.0] [-125.66370614359172, 0.23362977367196094]
-agcct4_in = bl.magnets[4] # [125.66370614359172, 0.245311262355559] [-150.79644737231004, 0.7225540930208885]
-agcct4_out = bl.magnets[5] # [-125.66370614359172, 0.245311262355559] [150.79644737231004, 0.7225540930208885]
-agcct5_in = bl.magnets[6] # [-150.79644737231004, 0.7334005209905551] [125.66370614359172, 1.2180784542693803]
-agcct5_out = bl.magnets[7] # [150.79644737231004, 0.7334005209905551] [-125.66370614359172, 1.2180784542693803]
+dicct_out = bl.magnets[0]  # [0.0, 0.0] [-804.247719318987, 1.1955505376161157]
+dicct_in = bl.magnets[1]  # [0.0, 0.0] [804.247719318987, 1.1955505376161157])
+# [0.0, 0.0] [125.66370614359172, 0.23362977367196094]
+agcct3_in = bl.magnets[2]
+# [0.0, 0.0] [-125.66370614359172, 0.23362977367196094]
+agcct3_out = bl.magnets[3]
+# [125.66370614359172, 0.245311262355559] [-150.79644737231004, 0.7225540930208885]
+agcct4_in = bl.magnets[4]
+# [-125.66370614359172, 0.245311262355559] [150.79644737231004, 0.7225540930208885]
+agcct4_out = bl.magnets[5]
+# [-150.79644737231004, 0.7334005209905551] [125.66370614359172, 1.2180784542693803]
+agcct5_in = bl.magnets[6]
+# [150.79644737231004, 0.7334005209905551] [-125.66370614359172, 1.2180784542693803]
+agcct5_out = bl.magnets[7]
 
 # 转为 wire
 wdicct_out = Wire.create_by_cct(dicct_out)
@@ -51,14 +55,14 @@ wagcct5_in = Wire.create_by_cct(agcct5_in)
 wagcct5_out = Wire.create_by_cct(agcct5_out)
 
 # 当前进行分析的 CCT
-delta_angle = -10 # 当 CCT 负 ksi 方向绕线时，写负数
-s_start = 0+delta_angle/2 - 20*360 + 44*360 # 起止 ksi
+delta_angle = -10  # 当 CCT 负 ksi 方向绕线时，写负数
+s_start = 0+delta_angle/2 - 20*360 + 44*360  # 起止 ksi
 s_end = -360*44-delta_angle/2 - 20*360 + 44*360
-s_number = 36*44 # 数目
-current_cct = agcct5_out # 当前 CCT 和 wire
+s_number = 36*44  # 数目
+current_cct = agcct5_out  # 当前 CCT 和 wire
 current_wire = wagcct5_out
-file_name = r'./全四层下四极CCT第3段外层固定坐标系.txt'
 固定坐标系 = True
+file_name = f'./全四层下四极CCT第3段外层{"固定" if 固定坐标系 else "滑动"}坐标系.txt'
 
 other_magnet = Magnets(*bl.magnets)
 other_magnet.remove(current_cct)
@@ -76,7 +80,6 @@ def task(s):
                 current_cct.p2_function(BaseUtils.angle_to_radian(s))
             )
         )
-
 
     fon = current_wire.lorentz_force_on_wire(
         s=BaseUtils.angle_to_radian(s),
@@ -103,7 +106,7 @@ if __name__ == "__main__":
 
     data = numpy.array(data)
 
-    numpy.savetxt(file_name,data)
+    numpy.savetxt(file_name, data)
 
     data = numpy.loadtxt(file_name)
 
@@ -114,11 +117,11 @@ if __name__ == "__main__":
 
         if 固定坐标系:
             Plot2.legend('x', 'y', 'z', font_size=18,
-                   font_family="Microsoft YaHei")
+                         font_family="Microsoft YaHei")
         else:
             Plot2.legend('绕线方向', 'rib方向', '径向', font_size=18,
-                        font_family="Microsoft YaHei")
-        
+                         font_family="Microsoft YaHei")
+
         Plot2.info('index', 'lorentz_force/N', '',
                    font_size=18, font_family="Microsoft YaHei")
         Plot2.show()

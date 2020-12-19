@@ -92,3 +92,80 @@ ssh node0x
 使用 exit 退出
 
 8. 三台主机时钟同步
+
+同步方案：1）所有主机和某台主机时钟同步；2）利用互联网，和时钟同步服务器同步
+
+这里采用方案2
+
+```
+## 安装 ntp，-y 安装过程全选为 yes
+yum install -y ntp
+## 编辑定时任务
+crontab -e
+## 每分钟和时钟服务器同步
+*/1 * * * * /usr/sbin/ntpdate ntp4.aliyun.com;
+```
+
+9. 安装 jdk8
+
+```
+## 如果存在 openjdk 先卸载
+rpm -qa | grep java
+
+## 创建两个目录
+mkdir -p /export/softwares # 存软件包
+mkdir -p /export/servers # 安装目录
+
+## jdk8 上传到/export/softwares并解压
+tar -zxvf jdk8xxx.tar.gz -C ../servers
+
+## 配置环境变量
+vi /etc/profile
+
+export JAVA_HOME=/export/servers/jdk1.8...
+export PATH=:$JAVA_HOME/bin:$PATH
+
+## 生效
+source /etc/profile
+
+## 可以远程复制 jdk 包到其他的主机
+scp -r /export/servers/jdk node02:/export/servers
+```
+
+10. 安装 MySQL（很多服务需要）
+
+只在 node03 安装 MySQL
+
+```
+## 在线安装
+yum install mysql mysql-server mysql-devel
+
+## 启动 MySQL 服务
+/etc/init.d/mysqld start
+
+## 自动设置参数
+/usr/bin/mysql_secure_installation
+
+## 授权
+grant all privileges on *.* to 'root'@'*' identified by '123456' with grant option;
+flush privileges;
+```
+
+上面不好用，使用 docker
+
+```
+yum -y install docker
+
+systemctl start docker
+
+systemctl status docker
+
+docker pull mysql:5.7
+
+docker run -p 3306:3306 --name mysql57 \
+             -e MYSQL_ROOT_PASSWORD=123456 \
+             -d mysql:5.7
+```
+
+vscode 管理 MySQL
+https://www.sohu.com/a/387319102_468635 

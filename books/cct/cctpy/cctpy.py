@@ -11,6 +11,7 @@ import time  # since v0.1.1 统计计算时长
 from typing import Callable, Generic, List, NoReturn, Optional, Tuple, TypeVar, Union
 import matplotlib.pyplot as plt
 import math
+import random # since v0.1.1 随机数
 import sys
 import os  # since v0.1.1 查看CPU核心数
 import numpy
@@ -476,6 +477,15 @@ class P3:
         self.x = other.x
         self.y = other.y
         self.z = other.z
+
+    @staticmethod
+    def random()->'P3':
+        """
+        随机产生一个 P3
+        random.random() 返回随机生成的一个实数，它在[0,1)范围内。
+        since v0.1.1
+        """
+        return P3(random.random(),random.random(),random.random())
 
 
 class LocalCoordinateSystem:
@@ -2985,6 +2995,8 @@ class CCT(Magnet, ApertureObject):
             返回二维坐标 (ξ,φ) 映射到的三维坐标 (x,y,z) 点，
             它在圆环面上的法向量
             即返回值 P3 在这点 (x,y,z) 垂直于圆环面
+
+            注意：已正则归一化
             """
             phi = p.y
 
@@ -3203,13 +3215,21 @@ class CCT(Magnet, ApertureObject):
             global_elementary_current_positions.flatten()
         )
     
-    def p2_function(self,ksi):
+    def p2_function(self,ksi)->P2:
         """
         二维坐标系点 (ksi, phi)
 
         since v0.1.1
         """
         return P2(ksi,self.phi_ksi_function(ksi))
+    
+    def p3_function(self,ksi)->P3:
+        """
+        局部坐标系下路径方程
+
+        since v0.1.1
+        """
+        return self.bipolar_toroidal_coordinate_system.convert(self.p2_function(ksi))
 
 
 class QS(Magnet, ApertureObject):
@@ -5221,19 +5241,21 @@ def beamline_phase_ellipse_multi_delta(bl: Beamline, particle_number: int,
 if __name__ == "__main__":
     BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
 
+    data = [-8.085,73.808,80.988,94.383,91.650,106.654,67.901,90.941,9488.615,-7334.914,24,46,37]
+
     gantry = HUST_SC_GANTRY(
-        qs3_gradient=-8.0800,
-        qs3_second_gradient=-9.1322,
-        dicct345_tilt_angles=[30, 80.9085, 94.4910, 91.8350],
-        agcct345_tilt_angles=[107.7704 , 30, 70.7248, 89.5931],
-        dicct345_current=9517.3286,
-        agcct345_current=-7335.6473,
-        agcct3_winding_number=24,
-        agcct4_winding_number=46,
-        agcct5_winding_number=37,
-        agcct3_bending_angle = -67.5*(24)/(24+46+37),
-        agcct4_bending_angle = -67.5*(46)/(24+46+37),
-        agcct5_bending_angle = -67.5*(37)/(24+46+37)
+        qs3_gradient=data[0],
+        qs3_second_gradient=data[1],
+        dicct345_tilt_angles=[30, data[2], data[3], data[4]],
+        agcct345_tilt_angles=[data[5] , 30, data[6], data[7]],
+        dicct345_current=data[8],
+        agcct345_current=data[9],
+        agcct3_winding_number=data[10],
+        agcct4_winding_number=data[11],
+        agcct5_winding_number=data[12],
+        agcct3_bending_angle = -67.5*(data[10])/(data[10]+data[11]+data[12]),
+        agcct4_bending_angle = -67.5*(data[11])/(data[10]+data[11]+data[12]),
+        agcct5_bending_angle = -67.5*(data[12])/(data[10]+data[11]+data[12]),
     )
     bl_all = gantry.create_beamline()
 
