@@ -56,14 +56,14 @@ wagcct5_out = Wire.create_by_cct(agcct5_out)
 
 # 当前进行分析的 CCT
 delta_angle = -10  # 当 CCT 负 ksi 方向绕线时，写负数
-s_start = 0+delta_angle/2 - 20*360 + 44*360  # 起止 ksi
-s_end = -360*44-delta_angle/2 - 20*360 + 44*360
-s_number = 36*44  # 数目
+s_start = 0+delta_angle/2 - 24*360 +46*360  # 起止 ksi
+s_end = -360*37-delta_angle/2 - 24*360 +46*360
+s_number = 36*37  # 数目
 current_cct = agcct5_out  # 当前 CCT 和 wire
-current_wire = wagcct5_out
-固定坐标系 = True
+固定坐标系 = False
 file_name = f'./全四层下四极CCT第3段外层{"固定" if 固定坐标系 else "滑动"}坐标系.txt'
 
+current_wire = Wire.create_by_cct(current_cct)
 other_magnet = Magnets(*bl.magnets)
 other_magnet.remove(current_cct)
 
