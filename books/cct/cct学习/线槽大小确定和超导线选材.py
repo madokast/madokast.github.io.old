@@ -40,23 +40,23 @@ def work_line(current_density, max_manget, end_current_density):
     plt.plot([0, end_current_density*max_manget/current_density], [0, end_current_density], 'r--')
 
 
-# work_line(current_agcct / line_cross_section / (2*8), max_magnet_agcct, 1000) # 640
-work_line(current_agcct / line_cross_section / (2*7), max_magnet_agcct, 644) # 640
-# work_line(current_agcct / line_cross_section / (2*6), max_magnet_agcct, 1000) # 640
-# work_line(current_agcct / line_cross_section / (2*5), max_magnet_agcct, 1000) # 640
+# work_line(current_agcct / (2*8), max_magnet_agcct, 1000) # 640
+work_line(current_agcct / (2*8), max_magnet_agcct, 666) # 640
+# work_line(current_agcct / (2*6), max_magnet_agcct, 1000) # 640
+# work_line(current_agcct / (2*5), max_magnet_agcct, 1000) # 640
 
-# work_line(current_dicct / line_cross_section / (2*8), max_magnet_dicct, 1000) # 802
-work_line(current_dicct / line_cross_section / (2*7), max_magnet_dicct, 806) # 802
-# work_line(current_dicct / line_cross_section / (2*6), max_magnet_dicct, 1000) # 802
-# work_line(current_dicct / line_cross_section / (2*5), max_magnet_dicct, 1000) # 802
+# work_line(current_dicct / (2*8), max_magnet_dicct, 1000) # 802
+work_line(current_dicct / (2*8), max_magnet_dicct, 838) # 802
+# work_line(current_dicct / (2*6), max_magnet_dicct, 1000) # 802
+# work_line(current_dicct / (2*5), max_magnet_dicct, 1000) # 802
 
 def product_line(product_data_magnet, product_data_current):
     # plt.plot(product_data_magnet, product_data_current,"k--")
     plt.plot(product_data_magnet, product_data_current,"k.", markersize=10)
     plt.xlim(0, 10)
     plt.ylim(0, 1200)
-    plt.xlabel('B/T')
-    plt.ylabel('I/A')
+    plt.xlabel('B/T',fontsize=20)
+    plt.ylabel('I/A',fontsize=20)
 
     # 拟合
     fit = numpy.polyfit(product_data_magnet, product_data_current,2)
@@ -66,5 +66,8 @@ def product_line(product_data_magnet, product_data_current):
     plt.plot(xs,ys,'k--')
 
 product_line(product_data_magnet, product_data_current)
+
+plt.xticks(fontsize=20)
+plt.yticks(fontsize=20)
 
 plt.show()

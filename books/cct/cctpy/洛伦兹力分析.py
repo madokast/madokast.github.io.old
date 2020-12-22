@@ -56,12 +56,22 @@ wagcct5_out = Wire.create_by_cct(agcct5_out)
 
 # 当前进行分析的 CCT
 delta_angle = -10  # 当 CCT 负 ksi 方向绕线时，写负数
-s_start = 0+delta_angle/2 - 24*360 +46*360  # 起止 ksi
-s_end = -360*37-delta_angle/2 - 24*360 +46*360
+s_start = 0+delta_angle/2 - 24*360 +46*360   # 起止 ksi
+s_end = -360*37-delta_angle/2  - 24*360 +46*360
 s_number = 36*37  # 数目
-current_cct = agcct5_out  # 当前 CCT 和 wire
+current_cct = agcct5_out # 当前 CCT 和 wire
 固定坐标系 = False
-file_name = f'./全四层下四极CCT第3段外层{"固定" if 固定坐标系 else "滑动"}坐标系.txt'
+file_name = f'./全四层下四极CCT第三段外层{"固定" if 固定坐标系 else "滑动"}坐标系-压强.txt'
+
+if False:
+    # 保存代码
+    delta_angle = -10  # 当 CCT 负 ksi 方向绕线时，写负数
+    s_start = 0+delta_angle/2 - 24*360 +46*360  # 起止 ksi
+    s_end = -360*37-delta_angle/2 - 24*360 +46*360
+    s_number = 36*37  # 数目
+    current_cct = agcct5_out  # 当前 CCT 和 wire
+    固定坐标系 = False
+    file_name = f'./全四层下四极CCT第3段外层{"固定" if 固定坐标系 else "滑动"}坐标系.txt'
 
 current_wire = Wire.create_by_cct(current_cct)
 other_magnet = Magnets(*bl.magnets)
@@ -81,12 +91,21 @@ def task(s):
             )
         )
 
-    fon = current_wire.lorentz_force_on_wire(
+    # fon = current_wire.lorentz_force_on_wire(
+    #     s=BaseUtils.angle_to_radian(s),
+    #     delta_length=current_cct.small_r *
+    #     BaseUtils.angle_to_radian(delta_angle),
+    #     local_coordinate_point=lcp,
+    #     other_magnet=other_magnet
+    # )
+    fon = current_wire.pressure_on_wire_MPa(
         s=BaseUtils.angle_to_radian(s),
         delta_length=current_cct.small_r *
         BaseUtils.angle_to_radian(delta_angle),
         local_coordinate_point=lcp,
-        other_magnet=other_magnet
+        other_magnet=other_magnet,
+        channel_width=3.2*MM,
+        channel_depth=11*MM
     )
     print(fon)
     return fon
@@ -122,6 +141,8 @@ if __name__ == "__main__":
             Plot2.legend('绕线方向', 'rib方向', '径向', font_size=18,
                          font_family="Microsoft YaHei")
 
-        Plot2.info('index', 'lorentz_force/N', '',
+        # Plot2.info('index', 'lorentz_force/N', '',
+        #            font_size=18, font_family="Microsoft YaHei")
+        Plot2.info('index', 'pressure/MPa', '',
                    font_size=18, font_family="Microsoft YaHei")
         Plot2.show()

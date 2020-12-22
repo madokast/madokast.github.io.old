@@ -166,44 +166,60 @@ class Wire(Magnet):
         s 线圈位置，即要计算磁场的位置
         delta_length 分段长度
         local_coordinate_point 局部坐标系
+
+        返回值 位置点+磁场
         """
+        # 所在点（全局坐标系）
         p = self.line3.point_at(s)
+
+        # 所在点之前的导线
         pre_line3 = Line3(
             p3_function=self.line3.p3_function,
             start=self.line3.start,
             end=s - delta_length/2
         )
 
+        # 所在点之后的导线
         post_line3 = Line3(
             p3_function=self.line3.p3_function,
             start=s + delta_length/2,
             end=self.line3.end
         )
 
+        # 所在点之前的导线
         pre_wire = Wire(
             line3=pre_line3,
             current=self.current,
             delta_length=delta_length
         )
 
+        # 所在点之后的导线
         post_wire = Wire(
             line3=post_line3,
             current=self.current,
             delta_length=delta_length
         )
 
+        # 磁场
         B = pre_wire.magnetic_field_at(
             p) + post_wire.magnetic_field_at(p) + other_magnet.magnetic_field_at(p)
 
+        # 返回点 + 磁场
         return p, local_coordinate_point.vector_to_local_coordinate(B)
 
     def lorentz_force_on_wire(self, s: float, delta_length: float,
                               local_coordinate_point: LocalCoordinateSystem,
                               other_magnet: Magnet = Magnet.no_magnet()
                               ) -> Tuple[P3, P3]:
+        """
+        计算线圈上 s 位置处洛伦兹力
+        delta_length 线圈分段长度（s位置的这一段线圈不参与计算）
+        local_coordinate_point 洛伦兹力坐标系
+        """
         p, b = self.magnetic_field_on_wire(
             s=s,
             delta_length=delta_length,
+            # 我居然写多了，真厉害
             local_coordinate_point=LocalCoordinateSystem.global_coordinate_system(),
             other_magnet=other_magnet
         )
@@ -213,6 +229,45 @@ class Wire(Magnet):
         F = self.current * delta_length * (direct@b)
 
         return p, local_coordinate_point.vector_to_local_coordinate(F)
+
+    def pressure_on_wire_MPa(self, s: float, delta_length: float,
+                         local_coordinate_point: LocalCoordinateSystem,
+                         channel_width: float, channel_depth: float,
+                         other_magnet: Magnet = Magnet.no_magnet(),
+                         ) -> Tuple[P3, P3]:
+        """
+        计算压强，默认为 CCT
+
+        默认在 local_coordinate_point 坐标系下计算的洛伦兹力 F
+
+        Fx 绕线方向（应该是 0 ）
+        Fy rib 方向 / 副法线方向
+        Fz 径向
+
+        返回值点 P 和三个方向的压强Pr
+
+        Pr.x 绕线方向压强 Fx / (channel_width * channel_depth)
+        Pr.y rib 方向压强 Fy / (绕线方向长度 * channel_depth)
+        Pr.z 径向压强 Fz / (绕线方向长度 * channel_width)
+
+        关于《绕线方向长度》 == len(point_at(s + delta_length/2)-point_at(s - delta_length/2))
+
+        返回值为 点P和 三方向压强/兆帕
+        """
+        p, f = self.lorentz_force_on_wire(
+            s, delta_length, local_coordinate_point, other_magnet
+        )
+
+        winding_direct_length: float = (self.line3.point_at(s+delta_length/2) -
+                                        self.line3.point_at(s-delta_length/2)).length()
+
+        pressure: P3 = P3(
+            x=f.x/(channel_width*channel_depth),
+            y=f.y/(winding_direct_length*channel_depth),
+            z=f.z/(winding_direct_length*channel_width)
+        )/1e6
+        
+        return p, pressure
 
     @staticmethod
     def create_by_cct(cct: CCT) -> 'Wire':
