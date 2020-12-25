@@ -1,14 +1,11 @@
 """
 CCTPY 辅助功能，一般不必使用
+
+@Author 赵润晓
 """
 
 import math
 from cctpy import *
-
-try:
-    from books.cct.cctpy.cctpy import *
-except ModuleNotFoundError:
-    pass
 
 
 class Magnets(Magnet):

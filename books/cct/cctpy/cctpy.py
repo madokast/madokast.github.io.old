@@ -4,7 +4,9 @@ CCT 建模优化全套解决方案
 开发手册见 cctpy_developer_manual.pdf
 
 v0.1   初版 2020年12月3日
-v0.1.1
+v0.1.1      2020年12月25日
+
+@Author 赵润晓
 """
 import multiprocessing  # since v0.1.1 多线程计算
 import time  # since v0.1.1 统计计算时长
@@ -16,7 +18,7 @@ import sys
 import os  # since v0.1.1 查看CPU核心数
 import numpy
 from scipy.integrate import solve_ivp  # since v0.1.1 ODE45
-import warnings  # since v0.1.1 提醒方法过失
+import warnings  # since v0.1.1 提醒方法过时
 
 # 常量
 M: float = 1.0  # 一米
@@ -1069,6 +1071,7 @@ class Trajectory(Line2):
         self.__trajectoryList = [first_line]
         self.__length = first_line.get_length()
         self.__point_at_error_happen = False  # 是否发生 point_at 错误
+        self.__aperture_objrcts = []  # 用于绘制孔径轮廓，since 0.1.1
 
     def add_strait_line(self, length: float) -> "Trajectory":
         """
@@ -1199,11 +1202,130 @@ class Trajectory(Line2):
             return Trajectory(StraightLine2(length, direct, self.start_point))
 
     @staticmethod
-    def set_start_point(start_point: P2):
+    def set_start_point(start_point: P2) -> 'Trajectory.__TrajectoryBuilder':
         """
         设置 Trajectory 起点
         """
         return Trajectory.__TrajectoryBuilder(start_point)
+
+    def get_line2_list(self) -> List[Line2]:
+        """
+        暴露内部 line2 list
+        主要用于画图
+
+        since 0.1.1
+        """
+        return self.__trajectoryList
+
+    def as_aperture_objrct_on_last(self, aperture_radius: float) -> "Trajectory":
+        """
+        给 traj 轨迹中最后一段添加孔径信息
+        这个信息只用于绘图，无其他意义
+        使用示例：
+        -----------------------------
+        Trajectory.set_start_point(P2.origin()).first_line(P2.x_direct(), DL1)
+            .add_arc_line(radius=0.95, clockwise=False, angle_deg=45/2)
+            .add_strait_line(length=GAP1)
+            .add_strait_line(length=qs1_length).as_aperture_objrct_on_last(20*MM)
+            .add_strait_line(length=GAP2)
+            .add_strait_line(length=qs2_length).as_aperture_objrct_on_last(20*MM)
+            .add_strait_line(length=GAP2)
+            .add_strait_line(length=qs1_length).as_aperture_objrct_on_last(20*MM)
+            .add_strait_line(length=GAP1)
+            .add_arc_line(radius=0.95, clockwise=False, angle_deg=45/2)
+        -----------------------------
+
+        since 0.1.1
+        """
+        if len(self.__trajectoryList) == 0:
+            print(f"无法将traj最后一段添加孔径轮廓，因为traj{self}为空")
+        else:
+            last_line = self.__trajectoryList[-1]
+            if isinstance(last_line, StraightLine2):
+                length = last_line.length
+                direct = last_line.direct
+                start_point = last_line.start_point
+
+                self.__aperture_objrcts.append(StraightLine2(
+                    length=length,
+                    direct=direct,
+                    start_point=start_point +
+                    direct.rotate(BaseUtils.angle_to_radian(
+                        90)).change_length(aperture_radius)
+                ))
+                self.__aperture_objrcts.append(StraightLine2(
+                    length=length,
+                    direct=direct,
+                    start_point=start_point -
+                    direct.rotate(BaseUtils.angle_to_radian(
+                        90)).change_length(aperture_radius)
+                ))
+                self.__aperture_objrcts.append(StraightLine2(
+                    length=aperture_radius*2,
+                    direct=direct.rotate(BaseUtils.angle_to_radian(90)),
+                    start_point=start_point -
+                    direct.rotate(BaseUtils.angle_to_radian(
+                        90)).change_length(aperture_radius)
+                ))
+                self.__aperture_objrcts.append(StraightLine2(
+                    length=aperture_radius*2,
+                    direct=direct.rotate(BaseUtils.angle_to_radian(90)),
+                    start_point=(start_point -
+                                 direct.rotate(BaseUtils.angle_to_radian(90)).change_length(aperture_radius) +
+                                 direct.change_length(length))
+                ))
+            elif isinstance(last_line, ArcLine2):
+                starting_phi = last_line.starting_phi
+                center = last_line.center
+                radius = last_line.radius
+                total_phi = last_line.total_phi
+                clockwise = last_line.clockwise
+                self.__aperture_objrcts.append(ArcLine2(
+                    starting_phi=starting_phi,
+                    center=center,
+                    radius=radius+aperture_radius,
+                    total_phi=total_phi,
+                    clockwise=clockwise,
+                ))
+                self.__aperture_objrcts.append(ArcLine2(
+                    starting_phi=starting_phi,
+                    center=center,
+                    radius=radius-aperture_radius,
+                    total_phi=total_phi,
+                    clockwise=clockwise,
+                ))
+
+                direct_start = last_line.direct_at_start()
+                direct_end = last_line.direct_at_end()
+                point_start = last_line.point_at_start()
+                point_end = last_line.point_at_end()
+                self.__aperture_objrcts.append(StraightLine2(
+                    length=aperture_radius*2,
+                    direct=direct_start.rotate(BaseUtils.angle_to_radian(90)),
+                    start_point=point_start -
+                    direct_start.rotate(BaseUtils.angle_to_radian(
+                        90)).change_length(aperture_radius)
+                ))
+                self.__aperture_objrcts.append(StraightLine2(
+                    length=aperture_radius*2,
+                    direct=direct_end.rotate(BaseUtils.angle_to_radian(90)),
+                    start_point=point_end -
+                    direct_end.rotate(BaseUtils.angle_to_radian(
+                        90)).change_length(aperture_radius)
+                ))
+            else:
+                print(f"无法给未知对象{last_line}添加孔径轮廓")
+
+        return self
+
+    def get_aperture_objrcts(self) -> List[Line2]:
+        """
+        暴露 __aperture_objrcts
+        用于画图
+
+        since 0.1.1 
+        """
+        return self.__aperture_objrcts
 
     @classmethod
     def __cctpy__(cls) -> List[Line2]:
@@ -2349,7 +2471,7 @@ class PhaseSpaceParticle:
     """
 
     def __init__(
-            self, x: float, xp: float, y: float, yp: float, z: float, delta: float
+            self, x: float = 0.0, xp: float = 0.0, y: float = 0.0, yp: float = 0.0, z: float = 0.0, delta: float = 0.0
     ):
         self.x = x
         self.xp = xp
@@ -2674,6 +2796,14 @@ class PhaseSpaceParticle:
         PhaseSpaceParticle 深拷贝
         """
         return PhaseSpaceParticle(self.x, self.xp, self.y, self.yp, self.z, self.delta)
+
+    def getDelta(self) -> float:
+        """
+        返回动量/能量分散 delta
+
+        since v0.1.1
+        """
+        return self.delta
 
 
 class ParticleFactory:
@@ -4846,9 +4976,58 @@ class Plot2:
     def plot_line2(line: Line2, step: float = 1 * MM, describe="r-") -> None:
         """
         绘制 line2
+
+        refactor 0.1.1 分开绘制 Line2 和 Trajectory
         """
-        p2s = line.disperse2d(step)
-        Plot2.plot_p2s(p2s, describe)
+        if isinstance(line, Trajectory):
+            Plot2.plot_trajectory(line, describes=describe)
+        else:
+            p2s = line.disperse2d(step)
+            Plot2.plot_p2s(p2s, describe)
+
+    @staticmethod
+    def plot_trajectory(trajectory: Trajectory, describes=['r-', 'b-', 'k-']) -> None:
+        """
+        绘制 trajectory
+        直线和弧线使用不同颜色
+
+        since 0.1.1
+        """
+        line2_list = trajectory.get_line2_list()
+
+        describe_straight_line = 'r-'
+        describe_arc_line = 'b-'
+        describe_aperture_objrcts = 'k-'
+
+        if isinstance(describes, List):
+            describe_straight_line = describes[0] if len(
+                describes) >= 1 else 'r-'
+            describe_arc_line = describes[1] if len(
+                describes) >= 2 else describe_straight_line
+            describe_aperture_objrcts = describes[2] if len(
+                describes) >= 3 else describe_straight_line
+        elif isinstance(describes, str):
+            describe_straight_line = describes
+            describe_arc_line = describes
+            describe_aperture_objrcts = describes
+        else:
+            print(f"Plot2.plot_trajectory 参数describes异常{describes}")
+
+        for l2 in line2_list:
+            if isinstance(l2, StraightLine2):
+                Plot2.plot_line2(l2, describe=describe_straight_line)
+            elif isinstance(l2, ArcLine2):
+                Plot2.plot_line2(l2, describe=describe_arc_line)
+            elif isinstance(l2, Trajectory):
+                Plot2.plot_trajectory(l2, describes)
+            elif isinstance(l2, Line2):
+                Plot2.plot_line2(l2, describe=describe_straight_line)
+            else:
+                print(f"无法绘制{l2}")
+
+        # 绘制轮廓
+        for a in trajectory.get_aperture_objrcts():
+            Plot2.plot_line2(a, describe=describe_aperture_objrcts)
 
     @staticmethod
     def equal():
@@ -5287,5 +5466,5 @@ if __name__ == "__main__":
     #     bl, 8, [-0.05, -0.025, 0, +0.025, 0.05]
     # )
 
-    cct:CCT = (bl.magnets[0])
+    cct: CCT = (bl.magnets[0])
     print(cct.conductor_length())

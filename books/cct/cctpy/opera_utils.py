@@ -1,14 +1,12 @@
 """
 opera 相关工具类
+
+@Author 赵润晓
 """
 
+from typing import List
 from cctpy import *
 from cctpy_ext import *
-
-try:
-    from books.cct.cctpy.cctpy import *
-except ModuleNotFoundError:
-    pass
 
 OPERA_CONDUCTOR_SCRIPT_HEAD: str = "CONDUCTOR\n"
 OPERA_CONDUCTOR_SCRIPT_TAIL: str = "QUIT\nEOF\n"

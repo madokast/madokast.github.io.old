@@ -3,6 +3,8 @@
 """
 GPU CUDA 加速 cctpy 束流跟踪
 
+@Author 赵润晓
+
 2020年12月8日 12点15分 核心束流跟踪功能已经完成，对比成功
 track cpu   p=p=[7.347173281024637, -5.038232430353374, -0.008126589272623864],v=[157601.42662973067, -174317561.422342, -223027.84656550566],v0=174317774.94179922
 track gpu32 p=p=[7.347180366516113, -5.038208484649658, -0.008126441389322281],v=[157731.0625, -174317456.0, -223028.46875],v0=174317776.0
@@ -28,6 +30,8 @@ class GPU_ACCELERATOR:
 
     def __init__(self, float_number_type: str = FLOAT32, block_dim_x: int = 1024, max_current_element_number: int = 2000*120) -> None:
         """
+        启动一个 GPU 加速器，用于加速 cctpy 束线的粒子跟踪（还有一些其他功能，效率反而不高）
+
         float_number_type 浮点数类型，取值为 FLOAT32 或 FLOAT64，即 32 位运行或 64 位，默认 32 位。
         64 位浮点数精度更高，但是计算的速度可能比 32 位慢 2-10 倍
 
@@ -721,6 +725,12 @@ class GPU_ACCELERATOR:
             cuda_code_10_run_multi_particle_multi_beamline
         )
 
+    def print_cuda_code(self) -> None:
+        """
+        打印cuda代码，供整体分析
+        """
+        print(self.cuda_code)
+
     def vct_length(self, p3: P3):
         """
         测试用函数，计算矢量长度
@@ -1104,6 +1114,7 @@ class GPU_ACCELERATOR:
         return ret
 
 
+# 以下都是测试代码
 if __name__ == "__main__":
     # 测试
     import unittest
@@ -1487,4 +1498,4 @@ diff=p=[0.0, -6.217248937900877e-15, -3.226585665316861e-16],v=[1.36496964842081
                         f"diff={ps_end[gid][pid]-(ps_cpu1+ps_cpu2 + ps_cpu3)[gid*3+pid]}")
 
     Test().test_track_particles_multi_beamline()
-    # unittest.main(verbosity=1)
+    unittest.main(verbosity=1)
