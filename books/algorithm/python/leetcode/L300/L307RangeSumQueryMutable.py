@@ -23,21 +23,71 @@ from typing import List
 class NumArray:
 
     def __init__(self, nums: List[int]):
-        pass
+        self.length = len(nums)
+        extern_length = 1
+        while extern_length < self.length:
+            extern_length *= 2
+
+        self.extern_length = extern_length
+
+        self.data_length = self.extern_length*2-1
+
+        self.offset = self.extern_length-1
+
+        self.data = [0]*self.offset + nums + [0]*(self.extern_length-self.length)
+
+        for i in range(self.offset-1, -1, -1):
+            self.data[i] = self.data[2*i+1] + self.data[2*i+2]
 
     def update(self, i: int, val: int) -> None:
-        pass
-
+        i+=self.offset
+        self.data[i] = val
+        while i>0:
+            i = (i-1)//2
+            self.data[i] = self.data[2*i+1] + self.data[2*i+2]
+        
+        if self.data_length>=3:
+            self.data[0] = self.data[1] + self.data[2]
 
     def sumRange(self, i: int, j: int) -> int:
-        pass
+        sum = 0
 
+        i+=self.offset
+        j+=self.offset
+
+        while i<j:
+            if i%2==0:
+                sum+=self.data[i]
+                i+=1
+            if j%2==1:
+                sum+=self.data[j]
+                j-=1
+            
+            i = (i-1)//2
+            j = (j-1)//2
+        
+        if i==j:
+            sum+=self.data[i]
+        
+        return sum
+
+    def __str__(self) -> str:
+        return str(self.data)
 
 
 # Your NumArray object will be instantiated and called as such:
 # obj = NumArray(nums)
 # obj.update(i,val)
 # param_2 = obj.sumRange(i,j)
-
 if __name__ == "__main__":
-    pass
+    na = NumArray([0,9,5,7,3])
+    print(na)
+
+    print(na.sumRange(1,2))
+
+    na.update(1,7)
+
+    print(na.sumRange(1,2))
+
+
+
