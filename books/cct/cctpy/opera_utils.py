@@ -245,7 +245,12 @@ class OperaConductor:
 
 
 if __name__ == "__main__":
-    data = [-8.085,73.808,80.988,94.383,91.650,106.654,67.901,90.941,9488.615,-7334.914,24,46,37]
+    # 2020 年参数
+    # data = [-8.085,73.808,80.988,94.383,91.650,106.654,67.901,90.941,9488.615,-7334.914,24,46,37]
+
+    # 2021.1.1 参数
+    data = [5.573, 	-44.622 ,	87.453 ,	92.142, 	90.667, 	94.344,
+     	73.471 ,	82.190 	,9426.734 ,	-5626.101 ,	25.000, 	40.000 ,	34.000]
 
     gantry = HUST_SC_GANTRY(
         qs3_gradient=data[0],
@@ -284,6 +289,6 @@ if __name__ == "__main__":
     b8s_list = [Brick8s.create_by_cct(c,3.2*MM,11*MM,'dicct',10) for c in diccts]
     b8s_list.extend([Brick8s.create_by_cct(c,3.2*MM,11*MM,'agcct',10) for c in agccts])
 
-    operafile = open("opera1219.txt", "w")
+    operafile = open("opera0101.txt", "w")
     operafile.write(OperaConductor.to_opera_cond_script(b8s_list))
     operafile.close()

@@ -5,6 +5,7 @@ CCT 建模优化全套解决方案
 
 v0.1   初版 2020年12月3日
 v0.1.1      2020年12月25日
+v0.1.2      2020年12月28日 添加相空间粒子映射时，单位转换 convert_to_mm
 
 @Author 赵润晓
 """
@@ -2480,29 +2481,36 @@ class PhaseSpaceParticle:
         self.z = z
         self.delta = delta
 
-    def project_to_xxp_plane(self) -> P2:
+    def project_to_xxp_plane(self, convert_to_mm: bool = False) -> P2:
         """
         投影到 x-xp 平面
         Returns [self.x, self.xp]
+
+        refactor v0.1.2 convert_to_mm 单位转换
         -------
 
         """
-        return P2(self.x, self.xp)
+        return P2(self.x * (1000 if convert_to_mm else 1), self.xp * (1000 if convert_to_mm else 1))
 
-    def project_to_yyp_plane(self) -> P2:
+    def project_to_yyp_plane(self, convert_to_mm: bool = False) -> P2:
         """
         投影到 y-yp 平面
         Returns [self.y, self.yp]
+
+        refactor v0.1.2 convert_to_mm 单位转换
         -------
 
         """
-        return P2(self.y, self.yp)
+        return P2(self.y * (1000 if convert_to_mm else 1), self.yp * (1000 if convert_to_mm else 1))
 
-    def project_to_plane(self, plane_id: int) -> P2:
+    def project_to_plane(self, plane_id: int, convert_to_mm: bool = False) -> P2:
+        """
+        refactor v0.1.2 convert_to_mm 单位转换
+        """
         if plane_id == PhaseSpaceParticle.XXP_PLANE:
-            return self.project_to_xxp_plane()
+            return self.project_to_xxp_plane(convert_to_mm=convert_to_mm)
         elif plane_id == PhaseSpaceParticle.YYP_PLANE:
-            return self.project_to_yyp_plane()
+            return self.project_to_yyp_plane(convert_to_mm=convert_to_mm)
         else:
             raise ValueError(f"没有处理plane_id({plane_id})的方法")
 
@@ -2597,7 +2605,7 @@ class PhaseSpaceParticle:
 
     @staticmethod
     def phase_space_particles_project_to_xxp_plane(
-            phase_space_particles: List,
+            phase_space_particles: List, convert_to_mm: bool = False
     ) -> List[P2]:
         """
         相空间粒子群投影到 x 平面
@@ -2606,14 +2614,16 @@ class PhaseSpaceParticle:
         phase_space_particles 相空间粒子群
 
         Returns 相空间粒子群投影到 x 平面 [[x1,xp1], [x2,xp2] .. ]
+
+        refactor v0.1.2 convert_to_mm 单位转换
         -------
 
         """
-        return [p.project_to_xxp_plane() for p in phase_space_particles]
+        return [p.project_to_xxp_plane(convert_to_mm=convert_to_mm) for p in phase_space_particles]
 
     @staticmethod
     def phase_space_particles_project_to_yyp_plane(
-            phase_space_particles: List,
+            phase_space_particles: List, convert_to_mm: bool = False
     ) -> List[P2]:
         """
         相空间粒子群投影到 y 平面
@@ -2622,14 +2632,16 @@ class PhaseSpaceParticle:
         phase_space_particles 相空间粒子群
 
         Returns 相空间粒子群投影到 y 平面 [[y1,yp1], [y2,yp2] .. ]
+
+        refactor v0.1.2 convert_to_mm 单位转换
         -------
 
         """
-        return [p.project_to_yyp_plane() for p in phase_space_particles]
+        return [p.project_to_yyp_plane(convert_to_mm=convert_to_mm) for p in phase_space_particles]
 
     @staticmethod
     def phase_space_particles_project_to_plane(
-            phase_space_particles: List, plane_id: int
+            phase_space_particles: List, plane_id: int, convert_to_mm: bool = False
     ) -> List[P2]:
         """
         相空间粒子群投影到 x/y 平面
@@ -2639,16 +2651,18 @@ class PhaseSpaceParticle:
         plane_id 投影到 x 或 y 平面
 
         Returns 相空间粒子群投影到 x/y 平面
+
+        refactor v0.1.2 convert_to_mm 单位转换
         -------
 
         """
         if plane_id == PhaseSpaceParticle.XXP_PLANE:
             return PhaseSpaceParticle.phase_space_particles_project_to_xxp_plane(
-                phase_space_particles
+                phase_space_particles, convert_to_mm=convert_to_mm
             )
         elif plane_id == PhaseSpaceParticle.YYP_PLANE:
             return PhaseSpaceParticle.phase_space_particles_project_to_yyp_plane(
-                phase_space_particles
+                phase_space_particles, convert_to_mm=convert_to_mm
             )
         else:
             raise ValueError(f"没有处理plane_id({plane_id})的方法")
@@ -3365,6 +3379,8 @@ class CCT(Magnet, ApertureObject):
         """
         计算导线长度
         line_number 导线数目
+
+        since v0.1.1
         """
         ksi0 = self.starting_point_in_ksi_phi_coordinate.x
         ksi1 = self.end_point_in_ksi_phi_coordinate.x
@@ -4781,6 +4797,8 @@ class Plot2:
                     Plot2.plot_p2s(param1, describe=describe)
                 elif isinstance(param1[0], P3):
                     Plot2.plot_p3s(param1, describe=describe)
+                else:
+                    print(f"无法绘制{data}")
             elif isinstance(param1, numpy.ndarray):
                 Plot2.plot_ndarry2ds(param1, describe=describe)
             elif isinstance(param1, CCT):
@@ -5436,8 +5454,8 @@ def beamline_phase_ellipse_multi_delta(bl: Beamline, particle_number: int,
 if __name__ == "__main__":
     BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
 
-    data = [-8.085, 73.808, 80.988, 94.383, 91.650, 106.654,
-            67.901, 90.941, 9488.615, -7334.914, 24, 46, 37]
+    data = [5.573, 	-44.622 ,	87.453 ,	92.142, 	90.667, 	94.344,
+     	73.471 ,	82.190 	,9426.734 ,	-5626.101 ,	25.000, 	40.000 ,	34.000]
 
     gantry = HUST_SC_GANTRY(
         qs3_gradient=data[0],
@@ -5452,6 +5470,27 @@ if __name__ == "__main__":
         agcct3_bending_angle=-67.5*(data[10])/(data[10]+data[11]+data[12]),
         agcct4_bending_angle=-67.5*(data[11])/(data[10]+data[11]+data[12]),
         agcct5_bending_angle=-67.5*(data[12])/(data[10]+data[11]+data[12]),
+
+        DL1=0.9007765,
+        GAP1=0.4301517,
+        GAP2=0.370816,
+        qs1_length=0.2340128,
+        qs1_aperture_radius=60 * MM,
+        qs1_gradient=0.0,
+        qs1_second_gradient=0.0,
+        qs2_length=0.200139,
+        qs2_aperture_radius=60 * MM,
+        qs2_gradient=0.0,
+        qs2_second_gradient=0.0,
+
+        DL2=2.35011,
+        GAP3=0.43188,
+        qs3_length=0.24379,
+
+        agcct345_inner_small_r=83 * MM,
+        agcct345_outer_small_r=98 * MM,  # 83+15
+        dicct345_inner_small_r=114 * MM,  # 83+30+1
+        dicct345_outer_small_r=130 * MM,  # 83+45 +2
     )
     bl_all = gantry.create_beamline()
 
@@ -5462,9 +5501,9 @@ if __name__ == "__main__":
 
     bl = gantry.create_second_bending_part(sp, sd)
 
-    # beamline_phase_ellipse_multi_delta(
-    #     bl, 8, [-0.05, -0.025, 0, +0.025, 0.05]
-    # )
+    beamline_phase_ellipse_multi_delta(
+        bl, 8, [-0.05, -0.025, 0, +0.025, 0.05]
+    )
 
-    cct: CCT = (bl.magnets[0])
-    print(cct.conductor_length())
+    # cct: CCT = (bl.magnets[0])
+    # print(cct.conductor_length())

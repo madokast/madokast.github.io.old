@@ -19,11 +19,11 @@ bl = (
     .append_agcct(
         big_r=R,
         small_rs=[128*MM, 113*MM, 98*MM, 83*MM],
-        bending_angles=[15.14, 29.02, 23.34],
-        tilt_angles=[[30, 80.988, 94.383, 91.650],
-                     [106.654, 30, 67.901, 90.941]],
-        winding_numbers=[[128], [24, 46, 37]],
-        currents=[9488.615, 7334.914],
+        bending_angles=[17.05, 27.27, 23.18],  # [15.14, 29.02, 23.34]
+        tilt_angles=[[30, 87.453,	92.142, 	90.667],
+                     [94.344, 30, 73.471,	82.190]],
+        winding_numbers=[[128], [25, 40, 34]],
+        currents=[9426.734, -5626.101],
         disperse_number_per_winding=36
     ).append_drift(1)
 )
@@ -56,18 +56,18 @@ wagcct5_out = Wire.create_by_cct(agcct5_out)
 
 # 当前进行分析的 CCT
 delta_angle = -10  # 当 CCT 负 ksi 方向绕线时，写负数
-s_start = 0+delta_angle/2 - 24*360 +46*360   # 起止 ksi
-s_end = -360*37-delta_angle/2  - 24*360 +46*360
-s_number = 36*37  # 数目
-current_cct = agcct5_out # 当前 CCT 和 wire
-固定坐标系 = False
-file_name = f'./全四层下四极CCT第三段外层{"固定" if 固定坐标系 else "滑动"}坐标系-压强.txt'
+s_start = 0+delta_angle/2 - 25*360 + 40*360  # 起止 ksi
+s_end = -360*34-delta_angle/2 - 25*360 + 40*360
+s_number = 36*34  # 数目
+current_cct = agcct5_out  # 当前 CCT 和 wire
+固定坐标系 = True
+file_name = f'./四极CCT第3段外层{"固定" if 固定坐标系 else "滑动"}坐标系-洛伦兹力.txt'
 
 if False:
     # 保存代码
     delta_angle = -10  # 当 CCT 负 ksi 方向绕线时，写负数
-    s_start = 0+delta_angle/2 - 24*360 +46*360  # 起止 ksi
-    s_end = -360*37-delta_angle/2 - 24*360 +46*360
+    s_start = 0+delta_angle/2 - 24*360 + 46*360  # 起止 ksi
+    s_end = -360*37-delta_angle/2 - 24*360 + 46*360
     s_number = 36*37  # 数目
     current_cct = agcct5_out  # 当前 CCT 和 wire
     固定坐标系 = False
@@ -141,8 +141,8 @@ if __name__ == "__main__":
             Plot2.legend('绕线方向', 'rib方向', '径向', font_size=18,
                          font_family="Microsoft YaHei")
 
-        # Plot2.info('index', 'lorentz_force/N', '',
-        #            font_size=18, font_family="Microsoft YaHei")
-        Plot2.info('index', 'pressure/MPa', '',
+        Plot2.info('index', 'lorentz_force/N', '',
                    font_size=18, font_family="Microsoft YaHei")
+        # Plot2.info('index', 'pressure/MPa', '',
+        #            font_size=18, font_family="Microsoft YaHei")
         Plot2.show()
