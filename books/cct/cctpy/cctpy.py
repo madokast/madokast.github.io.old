@@ -3,15 +3,19 @@ CCT 建模优化全套解决方案
 用户手册见
 开发手册见 cctpy_developer_manual.pdf
 
-v0.1   初版 2020年12月3日
+v0.1        初版 2020年12月3日
 v0.1.1      2020年12月25日
 v0.1.2      2020年12月28日 添加相空间粒子映射时，单位转换 convert_to_mm
+v0.1.3      2021年1月4日 添加拉格朗日 4 点插值函数 BaseUtils.interpolate_lagrange
+            2021年1月5日 新增计算两直线交点的函数 StraightLine2.intersecting_point
+            2021年1月6日 新增计算直线一般式方程的方法 StraightLine2.straight_line_equation
 
 @Author 赵润晓
 """
+
 import multiprocessing  # since v0.1.1 多线程计算
 import time  # since v0.1.1 统计计算时长
-from typing import Callable, Generic, List, NoReturn, Optional, Tuple, TypeVar, Union
+from typing import Callable, Generic, Iterable, List, NoReturn, Optional, Tuple, TypeVar, Union
 import matplotlib.pyplot as plt
 import math
 import random  # since v0.1.1 随机数
@@ -268,6 +272,22 @@ class P2:
         ], [
             p.y for p in p2_list
         ])
+
+    @staticmethod
+    def extract_x(p2_list: List['P2']) -> List[float]:
+        """
+        see extract
+        since v0.1.3
+        """
+        return P2.extract(p2_list)[0]
+
+    @staticmethod
+    def extract_y(p2_list: List['P2']) -> List[float]:
+        """
+        see extract
+        since v0.1.3
+        """
+        return P2.extract(p2_list)[1]
 
 
 class P3:
@@ -605,6 +625,17 @@ class LocalCoordinateSystem:
         """
         return self.__str__()
 
+    def __eq__(self, other: "LocalCoordinateSystem", err: float = 1e-6, msg: Optional[str] = None) -> bool:
+        """
+        判断两个坐标系是否相同
+        """
+        return (
+            BaseUtils.equal(self.location, other.location, err, msg) and
+            BaseUtils.equal(self.XI, other.XI, err, msg) and
+            BaseUtils.equal(self.YI, other.YI, err, msg) and
+            BaseUtils.equal(self.ZI, other.ZI, err, msg)
+        )
+
     @staticmethod
     def create_by_y_and_z_direction(
             location: P3, y_direction: P3, z_direction: P3
@@ -937,6 +968,89 @@ class StraightLine2(Line2):
             return 1
         else:
             return -1
+
+    def straight_line_equation(self) -> Tuple[float, float, float]:
+        """
+        返回直线的一般式方程 A B C
+        Ax + By + C = 0
+        注意结果不唯一，不应用于比较
+        具体计算方法如下 from https://www.zybang.com/question/7699174d2637a60b3db85a4bc2e82c95.html
+
+        当x1=x2时，直线方程为x-x1=0
+        当y1=y2时，直线方程为y-y1=0
+        当x1≠x2，y1≠y2时，
+        直线的斜率k=(y2-y1)/(x2-x1)
+        故直线方程为y-y1=(y2-y1)/(x2-x1)×(x-x1)
+        即x2y-x1y-x2y1+x1y1=(y2-y1)x-x1(y2-y1)
+        即为(y2-y1)x-(x2-x1)y-x1(y2-y1)+(x2-x1)y1=0
+        即为(y2-y1)x-(x2-x1)y-x1y2+x2y1=0
+        A = Y2 - Y1
+        B = X1 - X2
+        C = X2*Y1 - X1*Y2
+
+        since v0.1.3
+        """
+        if BaseUtils.equal(self.direct.length(), 0, err=1e-10):
+            raise ValueError(
+                f"straight_line_equation 直线方向矢量 direct 长度为 0，无法计算一般式方程")
+
+        x1 = self.start_point.x
+        y1 = self.start_point.y
+        x2 = (self.direct+self.start_point).x
+        y2 = (self.direct+self.start_point).y
+
+        if BaseUtils.equal(x1, x2, err=1e-10):
+            return 1.0, 0.0, -x1
+        if BaseUtils.equal(y1, y2, err=1e-10):
+            return 0.0, 1.0, -y1
+
+        return (y2-y1), (x1-x2), (x2*y1-x1*y2)
+
+    @staticmethod
+    def intersecting_point(pa: P2, va: P2, pb: P2, vb: P2) -> Tuple[P2, float, float]:
+        """
+        求两条直线 a 和 b 的交点
+        pa 直线 a 上的一点
+        va 直线 a 方向
+        pb 直线 b 上的一点
+        vb 直线 b 方向
+
+        返回值为交点 cp，交点在直线 a 和 b 上的坐标 ka kb
+        即 cp = pa + va * ka = pb + vb * kb
+
+        since v0.1.3
+        """
+        # 方向矢量不能为 0
+        if BaseUtils.equal(va.length(), 0.0, err=1e-10):
+            raise ValueError(
+                f"intersecting_point：方向矢量 va 长度为零。pa={pa},pb={pb},va={va},vb={vb}")
+        if BaseUtils.equal(vb.length(), 0.0, err=1e-10):
+            raise ValueError(
+                f"intersecting_point：方向矢量 vb 长度为零。pa={pa},pb={pb},va={va},vb={vb}")
+        # 判断是否平行
+        if va.normalize() == vb.normalize() or (va.normalize()+vb.normalize()) == P2.origin():
+            print(
+                f"intersecting_point：两条直线平行，计算结果可能无意义。pa={pa},pb={pb},va={va},vb={vb}")
+
+        # pa 和 pb 就是交点。不短路，也走流程
+        # if pa==pb:
+        #     return pa,0.0,0.0
+
+        # 计算交点
+        # 为了防止除数为 0 ，只能将直线转为一般式
+        line_a = StraightLine2(length=1.0, direct=va, start_point=pa)
+        line_b = StraightLine2(length=1.0, direct=vb, start_point=pb)
+        A1, B1, C1 = line_a.straight_line_equation()
+        A2, B2, C2 = line_b.straight_line_equation()
+
+        cpy = (A1*C2-A2*C1)/(A2*B1-A1*B2)
+        cpx = -(B1*cpy+C1)/A1 if A1 != 0 else -(B2*cpy+C2)/A2
+        cp = P2(cpx, cpy)
+
+        ka = (cp.x-pa.x)/va.x if va.x != 0 else (cp.y-pa.y)/va.y
+        kb = (cp.x-pb.x)/vb.x if vb.x != 0 else (cp.y-pb.y)/vb.y
+
+        return cp, ka, kb
 
 
 class ArcLine2(Line2):
@@ -3202,6 +3316,8 @@ class CCT(Magnet, ApertureObject):
         只有当粒子轴向投影在元件内部时，才会进行判断，
         否则即时粒子距离轴线很远，也认为粒子没有超出孔径，
         这是因为粒子不在元件内时，很可能处于另一个大孔径元件中，这样会造成误判。
+
+        point 为全局坐标系点
         """
         # 转为局部坐标
         local_point = self.local_coordinate_system.point_to_local_coordinate(
@@ -3342,6 +3458,7 @@ class CCT(Magnet, ApertureObject):
         和
         电流元的位置 (p[i+1]+p[i])/2
         主要目的是为了 CUDA 计算
+
         since v0.1.1
         """
         global_path3: List[P3] = self.global_path3()
@@ -3718,10 +3835,18 @@ class Beamline(Line2, Magnet, ApertureObject):
             running_particles=rp_y,
         )
 
-        return (
-            [pp.project_to_xxp_plane() / MM for pp in pp_x_end],
-            [pp.project_to_yyp_plane() / MM for pp in pp_y_end],
+        xs = [pp.project_to_xxp_plane() / MM for pp in pp_x_end]
+        ys = [pp.project_to_yyp_plane() / MM for pp in pp_y_end]
+
+        s = BaseUtils.Statistic()
+
+        print(
+            f"delta={delta}," +
+            f"avg_size_x={s.clear().add_all(P2.extract(xs)[0]).helf_width()}mm," +
+            f"avg_size_y={s.clear().add_all(P2.extract(ys)[0]).helf_width()}mr"
         )
+
+        return (xs, ys)
 
     # from ApertureObject
     def is_out_of_aperture(self, point: P3) -> bool:
@@ -4257,6 +4382,54 @@ class BaseUtils:
         return [e * number for e in li]
 
     @staticmethod
+    def derivative(func: Callable[[float], Union[float, P2, P3]],
+                   delta: float = 1e-7) -> Callable[[float], Union[float, P2, P3]]:
+        """
+        函数 func 求导，微分
+        delta 即 Δ，f' = (f(x+Δ)-f(x))/Δ
+        """
+        def d(x: float) -> Union[float, P2, P3]:
+            return (func(x+delta)-func(x))/delta
+
+        return d
+
+    @staticmethod
+    def interpolate_lagrange(x: float, x0: float, y0: float,
+                             x1: float, y1: float, x2: float, y2: float, x3: float, y3: float,
+                             error: float = 1e-8) -> float:
+        """
+        拉格朗日插值法 4 个点
+        利用四点 (x0,y0) (x1,y1) (x2,y2) (x3,y3) 多项式插值，f(x)
+        返回 x 对应的 y，即 f(x)
+
+        当 x 和 xi 的差小于 error 时，直接返回 yi，既是为了快速计算，也是为了防止后面公式中除0
+
+        since v0.1.3 这个函数引入，为了计算 opera 导出的磁场表格数据，在任意一点的磁场
+        """
+        if abs(x-x0) < error:
+            return y0
+        if abs(x-x1) < error:
+            return y1
+        if abs(x-x2) < error:
+            return y2
+        if abs(x-x3) < error:
+            return y3
+
+        t0 = (x - x1)*(x - x2)*(x - x3)*y0 / ((x0 - x1)*(x0 - x2)*(x0 - x3))
+        t1 = (x - x0)*(x - x2)*(x - x3)*y1 / ((x1 - x0)*(x1 - x2)*(x1 - x3))
+        t2 = (x - x0)*(x - x1)*(x - x3)*y2 / ((x2 - x0)*(x2 - x1)*(x2 - x3))
+        t3 = (x - x0)*(x - x1)*(x - x2)*y3 / ((x3 - x0)*(x3 - x1)*(x3 - x2))
+
+        tt = t0 + t1 + t2 + t3
+
+        if math.isnan(tt):
+            print(
+                f"error in interpolate_lagrange params={x},{x0},{y0},{x1},{y1},{x2},{y2},{x3},{y3}")
+            return 0.0
+
+        return tt
+
+    @staticmethod
     def is_sorted(li: List) -> bool:
         """
         判断数组是否有序
@@ -4491,28 +4664,64 @@ class BaseUtils:
         """
         统计器
         since v0.1.1
+        refactor v0.1.3 增加 add_all 和 helf_width 方法
         """
 
         def __init__(self):
             self.__data: List[float] = []
 
-        def add(self, val: float):
+        def add(self, val: float) -> 'BaseUtils.Statistic':
+            """
+            添加元素
+            """
             self.__data.append(val)
+            return self
 
-        def max(self):
+        def add_all(self, vals: Iterable[float]) -> 'BaseUtils.Statistic':
+            """
+            添加多个元素
+            """
+            self.__data.extend(vals)
+            return self
+
+        def max(self) -> float:
+            """
+            最大值
+            """
             return numpy.max(self.__data)
 
-        def min(self):
+        def min(self) -> float:
+            """
+            最小值
+            """
             return numpy.min(self.__data)
 
-        def var(self):
+        def var(self) -> float:
+            """
+            方差
+            """
             return numpy.var(self.__data)
 
-        def average(self):
+        def average(self) -> float:
+            """
+            均值
+            """
             return sum(self.__data) / len(self.__data)
 
+        def helf_width(self) -> float:
+            """
+            半宽
+            即 (max-min)/2
+            这个方法用于求束斑大小
+            """
+            return (self.max()-self.min())/2
+
         def clear(self):
+            """
+            清空
+            """
             self.__data: List[float] = []
+            return self
 
 
 class Plot3:
@@ -5105,7 +5314,7 @@ class Plot2:
         展示图象
         """
         if not Plot2.INIT:
-            raise RuntimeError("Plot2::请在show前调用plot")
+            print("Plot2::请在show前调用plot")
 
         plt.show()
 
@@ -5412,10 +5621,11 @@ class HUST_SC_GANTRY:
 
 
 def beamline_phase_ellipse_multi_delta(bl: Beamline, particle_number: int,
-                                       dps: List[float], describles: str = ['r-', 'y-', 'b-', 'k-', 'g-', 'c-', 'm-']):
+                                       dps: List[float], describles: str = ['r-', 'y-', 'b-', 'k-', 'g-', 'c-', 'm-'],
+                                       foot_step: float = 10*MM):
     if len(dps) > len(describles):
         raise ValueError(
-            f'describles(size={len(describles)}) 长度应大于 dps(size={len(dps)})')
+            f'describles(size={len(describles)}) 长度应大于等于 dps(size={len(dps)})')
     xs = []
     ys = []
     for dp in dps:
@@ -5424,7 +5634,7 @@ def beamline_phase_ellipse_multi_delta(bl: Beamline, particle_number: int,
             y_sigma_mm=3.5, yp_sigma_mrad=7.5,
             delta=dp, particle_number=particle_number,
             kinetic_MeV=215, concurrency_level=16,
-            footstep=10*MM
+            footstep=foot_step
         )
         xs.append(x + [x[0]])
         ys.append(y + [y[0]])
@@ -5448,62 +5658,172 @@ def beamline_phase_ellipse_multi_delta(bl: Beamline, particle_number: int,
     plt.legend(['dp'+str(int(dp*100)) for dp in dps])
     plt.axis("equal")
 
-    plt.show()
+    # plt.show()
 
 
 if __name__ == "__main__":
-    BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
+    if False:
+        BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
 
-    data = [5.573, 	-44.622 ,	87.453 ,	92.142, 	90.667, 	94.344,
-     	73.471 ,	82.190 	,9426.734 ,	-5626.101 ,	25.000, 	40.000 ,	34.000]
+        data = [5.546, -57.646, 87.426, 92.151, 91.668, 94.503, 	72.425,	82.442,	9445.242 	,
+                -5642.488,	25.000,	40.000, 	34.000
+                ]
 
-    gantry = HUST_SC_GANTRY(
-        qs3_gradient=data[0],
-        qs3_second_gradient=data[1],
-        dicct345_tilt_angles=[30, data[2], data[3], data[4]],
-        agcct345_tilt_angles=[data[5], 30, data[6], data[7]],
-        dicct345_current=data[8],
-        agcct345_current=data[9],
-        agcct3_winding_number=data[10],
-        agcct4_winding_number=data[11],
-        agcct5_winding_number=data[12],
-        agcct3_bending_angle=-67.5*(data[10])/(data[10]+data[11]+data[12]),
-        agcct4_bending_angle=-67.5*(data[11])/(data[10]+data[11]+data[12]),
-        agcct5_bending_angle=-67.5*(data[12])/(data[10]+data[11]+data[12]),
+        gantry = HUST_SC_GANTRY(
+            qs3_gradient=data[0],
+            qs3_second_gradient=data[1],
+            dicct345_tilt_angles=[30, data[2], data[3], data[4]],
+            agcct345_tilt_angles=[data[5], 30, data[6], data[7]],
+            dicct345_current=data[8],
+            agcct345_current=data[9],
+            agcct3_winding_number=data[10],
+            agcct4_winding_number=data[11],
+            agcct5_winding_number=data[12],
+            agcct3_bending_angle=-67.5*(data[10])/(data[10]+data[11]+data[12]),
+            agcct4_bending_angle=-67.5*(data[11])/(data[10]+data[11]+data[12]),
+            agcct5_bending_angle=-67.5*(data[12])/(data[10]+data[11]+data[12]),
 
-        DL1=0.9007765,
-        GAP1=0.4301517,
-        GAP2=0.370816,
-        qs1_length=0.2340128,
-        qs1_aperture_radius=60 * MM,
-        qs1_gradient=0.0,
-        qs1_second_gradient=0.0,
-        qs2_length=0.200139,
-        qs2_aperture_radius=60 * MM,
-        qs2_gradient=0.0,
-        qs2_second_gradient=0.0,
+            DL1=0.9007765,
+            GAP1=0.4301517,
+            GAP2=0.370816,
+            qs1_length=0.2340128,
+            qs1_aperture_radius=60 * MM,
+            qs1_gradient=0.0,
+            qs1_second_gradient=0.0,
+            qs2_length=0.200139,
+            qs2_aperture_radius=60 * MM,
+            qs2_gradient=0.0,
+            qs2_second_gradient=0.0,
 
-        DL2=2.35011,
-        GAP3=0.43188,
-        qs3_length=0.24379,
+            DL2=2.35011,
+            GAP3=0.43188,
+            qs3_length=0.24379,
 
-        agcct345_inner_small_r=83 * MM,
-        agcct345_outer_small_r=98 * MM,  # 83+15
-        dicct345_inner_small_r=114 * MM,  # 83+30+1
-        dicct345_outer_small_r=130 * MM,  # 83+45 +2
-    )
-    bl_all = gantry.create_beamline()
+            agcct345_inner_small_r=83 * MM,
+            agcct345_outer_small_r=98 * MM,  # 83+15
+            dicct345_inner_small_r=114 * MM,  # 83+30+1
+            dicct345_outer_small_r=130 * MM,  # 83+45 +2
+        )
+        bl_all = gantry.create_beamline()
 
-    f = gantry.first_bending_part_length()
+        f = gantry.first_bending_part_length()
 
-    sp = bl_all.trajectory.point_at(f)
-    sd = bl_all.trajectory.direct_at(f)
+        sp = bl_all.trajectory.point_at(f)
+        sd = bl_all.trajectory.direct_at(f)
 
-    bl = gantry.create_second_bending_part(sp, sd)
+        bl = gantry.create_second_bending_part(sp, sd)
 
-    beamline_phase_ellipse_multi_delta(
-        bl, 8, [-0.05, -0.025, 0, +0.025, 0.05]
-    )
+        beamline_phase_ellipse_multi_delta(
+            bl, 16, [0.0], describles=['r-'], foot_step=10*MM
+        )
 
-    # cct: CCT = (bl.magnets[0])
-    # print(cct.conductor_length())
+        gantry = HUST_SC_GANTRY(
+            qs3_gradient=data[0],
+            qs3_second_gradient=data[1],
+            dicct345_tilt_angles=[30, data[2], data[3], data[4]],
+            agcct345_tilt_angles=[data[5], 30, data[6], data[7]],
+            dicct345_current=data[8],
+            agcct345_current=data[9],
+            agcct3_winding_number=data[10],
+            agcct4_winding_number=data[11],
+            agcct5_winding_number=data[12],
+            agcct3_bending_angle=-67.5*(data[10])/(data[10]+data[11]+data[12]),
+            agcct4_bending_angle=-67.5*(data[11])/(data[10]+data[11]+data[12]),
+            agcct5_bending_angle=-67.5*(data[12])/(data[10]+data[11]+data[12]),
+
+            DL1=0.9007765,
+            GAP1=0.4301517,
+            GAP2=0.370816,
+            qs1_length=0.2340128,
+            qs1_aperture_radius=60 * MM,
+            qs1_gradient=0.0,
+            qs1_second_gradient=0.0,
+            qs2_length=0.200139,
+            qs2_aperture_radius=60 * MM,
+            qs2_gradient=0.0,
+            qs2_second_gradient=0.0,
+
+            DL2=2.35011,
+            GAP3=0.43188,
+            qs3_length=0.24379,
+
+            agcct345_inner_small_r=83 * MM,
+            agcct345_outer_small_r=98 * MM + 1*MM,  # 83+15
+            dicct345_inner_small_r=114 * MM + 1*MM*2,  # 83+30+1
+            dicct345_outer_small_r=130 * MM + 1*MM*3,  # 83+45 +2
+        )
+        bl_all = gantry.create_beamline()
+
+        f = gantry.first_bending_part_length()
+
+        sp = bl_all.trajectory.point_at(f)
+        sd = bl_all.trajectory.direct_at(f)
+
+        bl = gantry.create_second_bending_part(sp, sd)
+
+        beamline_phase_ellipse_multi_delta(
+            bl, 16, [0.0], describles=['b-'], foot_step=10*MM
+        )
+
+        plt.show()
+
+        # cct: CCT = (bl.magnets[0])
+        # print(cct.conductor_length())
+
+    if True:
+        BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
+
+        data = [5.105, 	58.973 ,	89.902, 	96.877 ,	99.592 ,
+        	93.596 ,	63.308 ,	80.454 ,	9552.681 ,	-7459.877 ,
+            	25.000,	40.000, 	34.000
+                ]
+
+        gantry = HUST_SC_GANTRY(
+            qs3_gradient=data[0],
+            qs3_second_gradient=data[1],
+            dicct345_tilt_angles=[30, data[2], data[3], data[4]],
+            agcct345_tilt_angles=[data[5], 30, data[6], data[7]],
+            dicct345_current=data[8],
+            agcct345_current=data[9],
+            agcct3_winding_number=data[10],
+            agcct4_winding_number=data[11],
+            agcct5_winding_number=data[12],
+            agcct3_bending_angle=-67.5*(data[10])/(data[10]+data[11]+data[12]),
+            agcct4_bending_angle=-67.5*(data[11])/(data[10]+data[11]+data[12]),
+            agcct5_bending_angle=-67.5*(data[12])/(data[10]+data[11]+data[12]),
+
+            DL1=0.9007765,
+            GAP1=0.4301517,
+            GAP2=0.370816,
+            qs1_length=0.2340128,
+            qs1_aperture_radius=60 * MM,
+            qs1_gradient=0.0,
+            qs1_second_gradient=0.0,
+            qs2_length=0.200139,
+            qs2_aperture_radius=60 * MM,
+            qs2_gradient=0.0,
+            qs2_second_gradient=0.0,
+
+            DL2=2.35011,
+            GAP3=0.43188,
+            qs3_length=0.24379,
+
+            agcct345_inner_small_r=83 * MM + 9.5*MM,
+            agcct345_outer_small_r=98 * MM + 9.5*MM,  # 83+15
+            dicct345_inner_small_r=114 * MM + 9.5*MM,  # 83+30+1
+            dicct345_outer_small_r=130 * MM + 9.5*MM,  # 83+45 +2
+        )
+        bl_all = gantry.create_beamline()
+
+        f = gantry.first_bending_part_length()
+
+        sp = bl_all.trajectory.point_at(f)
+        sd = bl_all.trajectory.direct_at(f)
+
+        bl = gantry.create_second_bending_part(sp, sd)
+
+        beamline_phase_ellipse_multi_delta(
+            bl, 8, [-0.05, -0.025, 0, +0.025, 0.05]
+        )
+
+        plt.show()

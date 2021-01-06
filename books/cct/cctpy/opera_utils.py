@@ -1,12 +1,27 @@
 """
 opera 相关工具类
+1. 将 CCT 转为 opera 中的 Brick8 导体块，并导出为 cond 文件
+    关键方法 Brick8s.create_by_cct()、OperaConductor.to_opera_cond_script()
+
+2. 读取 opera 磁场表格文件，生成 cctpy 中的 Magnet 对象
+
+
+2021年1月4日 新增 opera 导出的磁场文件读入功能，读入磁场表格文件，即返回一个 Magnet
+2021年1月4日 新增读入 opera track 轨迹 log 文件功能，返回一个 Line3
 
 @Author 赵润晓
 """
 
+try:
+    from books.cct.cctpy.cctpy import *
+except:
+    pass
+
 from typing import List
+
 from cctpy import *
 from cctpy_ext import *
+import numpy
 
 OPERA_CONDUCTOR_SCRIPT_HEAD: str = "CONDUCTOR\n"
 OPERA_CONDUCTOR_SCRIPT_TAIL: str = "QUIT\nEOF\n"
@@ -244,51 +259,122 @@ class OperaConductor:
         return '\n'.join(ret)
 
 
+class OperaFieldTableMagnet(Magnet):
+    """
+    利用 opera 磁场表格文件生成的磁场
+    文件主体应为 6 列，分别是 x y z bx by bz
+    """
+
+    def __init__(self, file_name: str,
+                 first_corner_x: float, first_corner_y: float, first_corner_z: float,
+                 step_between_points_x: float, step_between_points_y: float, step_between_points_z: float,
+                 number_of_points_x: int, number_of_points_y: int, number_of_points_z: int,
+                 unit_of_length: float = M, unit_of_field: float = 1
+                 ) -> None:
+        """
+        first_corner_x / y / z 即 opera 导出磁场时 First corner 填写的值
+        step_between_points_x / y / z 即 opera 导出磁场时 Step between points 填写的值
+        number_of_points_x / y / z 即 opera 导出磁场时 Number of points 填写的值
+        unit_of_length 是数据中长度单位，默认米。（注意 opera 中默认毫米，如果 opera 未修改单位，需要设为毫米 MM）
+        unit_of_field 是磁场单位，默认特斯拉 T。
+
+        以上所有参数，都可以利用磁场文件中前 8 行的元数据获知，但介于 python 性能一般就不分析了。（其实是懒）
+        """
+        # 打开磁场表格文件
+        """
+        5 461 311 2
+        1 X [METRE]
+        2 Y [METRE]
+        3 Z [METRE]
+        4 BX [TESLA]
+        5 BY [TESLA]
+        6 BZ [TESLA]
+        0
+        -0.550000000000      -1.10000000000     -0.100000000000E-01  0.500216216871E-04  0.431668985488E-05 -0.180396818407E-02
+        -0.550000000000      -1.10000000000     -0.500000000000E-02  0.422312886145E-04 -0.426162472137E-05 -0.180415005970E-02
+        ... ...
+        """
+        # 总点数
+        self.x0 = first_corner_x*unit_of_length
+        self.y0 = first_corner_y*unit_of_length
+        self.z0 = first_corner_z*unit_of_length
+        self.gap_x = step_between_points_x*unit_of_length
+        self.gap_y = step_between_points_y*unit_of_length
+        self.gap_z = step_between_points_z*unit_of_length
+        self.number_of_points_x = int(number_of_points_x)
+        self.number_of_points_y = int(number_of_points_y)
+        self.number_of_points_z = int(number_of_points_z)
+        self.total_point_number = self.number_of_points_x * \
+            self.number_of_points_y*self.number_of_points_z
+        print(f"table 文件包含 {self.total_point_number} 个节点")
+
+        # 读取数据，使用 numpy
+        data = numpy.loadtxt(fname=file_name, skiprows=8)  # 跳过 8 行，因为前 8 行非数据
+        # 找出代表bx by bz 的列
+        self.mxs = data[:, 3]
+        self.mys = data[:, 4]
+        self.mzs = data[:, 5]
+
+        if abs(unit_of_field-1) < 1e-6:
+            self.mxs = self.mxs * unit_of_field
+            self.mys = self.mys * unit_of_field
+            self.mzs = self.mzs * unit_of_field
+
+    def magnetic_field_at(self, point: P3) -> P3:
+        """
+        核心方法
+        """
+        raise NotImplementedError
+
+
 if __name__ == "__main__":
-    # 2020 年参数
-    # data = [-8.085,73.808,80.988,94.383,91.650,106.654,67.901,90.941,9488.615,-7334.914,24,46,37]
+    if False:
+        # 2020 年参数
+        # data = [-8.085,73.808,80.988,94.383,91.650,106.654,67.901,90.941,9488.615,-7334.914,24,46,37]
 
-    # 2021.1.1 参数
-    data = [5.573, 	-44.622 ,	87.453 ,	92.142, 	90.667, 	94.344,
-     	73.471 ,	82.190 	,9426.734 ,	-5626.101 ,	25.000, 	40.000 ,	34.000]
+        # 2021.1.1 参数
+        data = [5.573, 	-44.622,	87.453,	92.142, 	90.667, 	94.344,
+                73.471,	82.190 	, 9426.734,	-5626.101,	25.000, 	40.000,	34.000]
 
-    gantry = HUST_SC_GANTRY(
-        qs3_gradient=data[0],
-        qs3_second_gradient=data[1],
-        dicct345_tilt_angles=[30, data[2], data[3], data[4]],
-        agcct345_tilt_angles=[data[5] , 30, data[6], data[7]],
-        dicct345_current=data[8],
-        agcct345_current=data[9],
-        agcct3_winding_number=data[10],
-        agcct4_winding_number=data[11],
-        agcct5_winding_number=data[12],
-        agcct3_bending_angle = -67.5*(data[10])/(data[10]+data[11]+data[12]),
-        agcct4_bending_angle = -67.5*(data[11])/(data[10]+data[11]+data[12]),
-        agcct5_bending_angle = -67.5*(data[12])/(data[10]+data[11]+data[12]),
-    )
+        gantry = HUST_SC_GANTRY(
+            qs3_gradient=data[0],
+            qs3_second_gradient=data[1],
+            dicct345_tilt_angles=[30, data[2], data[3], data[4]],
+            agcct345_tilt_angles=[data[5], 30, data[6], data[7]],
+            dicct345_current=data[8],
+            agcct345_current=data[9],
+            agcct3_winding_number=data[10],
+            agcct4_winding_number=data[11],
+            agcct5_winding_number=data[12],
+            agcct3_bending_angle=-67.5*(data[10])/(data[10]+data[11]+data[12]),
+            agcct4_bending_angle=-67.5*(data[11])/(data[10]+data[11]+data[12]),
+            agcct5_bending_angle=-67.5*(data[12])/(data[10]+data[11]+data[12]),
+        )
 
-    bl_all = gantry.create_beamline()
+        bl_all = gantry.create_beamline()
 
-    f = gantry.first_bending_part_length()
+        f = gantry.first_bending_part_length()
 
-    sp = bl_all.trajectory.point_at(f)
-    sd = bl_all.trajectory.direct_at(f)
+        sp = bl_all.trajectory.point_at(f)
+        sd = bl_all.trajectory.direct_at(f)
 
-    bl = gantry.create_second_bending_part(sp, sd)
+        bl = gantry.create_second_bending_part(sp, sd)
 
-    diccts = bl.magnets[0:2]
-    agccts = bl.magnets[2:8]
+        diccts = bl.magnets[0:2]
+        agccts = bl.magnets[2:8]
 
-    # m = Magnets(*ccts)
+        # m = Magnets(*ccts)
 
-    # bz = m.magnetic_field_bz_along(bl.trajectory,step=10*MM)
+        # bz = m.magnetic_field_bz_along(bl.trajectory,step=10*MM)
 
-    # Plot2.plot(bz)
-    # Plot2.show()
+        # Plot2.plot(bz)
+        # Plot2.show()
 
-    b8s_list = [Brick8s.create_by_cct(c,3.2*MM,11*MM,'dicct',10) for c in diccts]
-    b8s_list.extend([Brick8s.create_by_cct(c,3.2*MM,11*MM,'agcct',10) for c in agccts])
+        b8s_list = [Brick8s.create_by_cct(
+            c, 3.2*MM, 11*MM, 'dicct', 10) for c in diccts]
+        b8s_list.extend([Brick8s.create_by_cct(
+            c, 3.2*MM, 11*MM, 'agcct', 10) for c in agccts])
 
-    operafile = open("opera0101.txt", "w")
-    operafile.write(OperaConductor.to_opera_cond_script(b8s_list))
-    operafile.close()
+        operafile = open("opera0101.txt", "w")
+        operafile.write(OperaConductor.to_opera_cond_script(b8s_list))
+        operafile.close()

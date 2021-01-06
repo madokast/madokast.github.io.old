@@ -1,16 +1,6 @@
 from cctpy import *
 from cctpy_ext import *
 
-try:
-    from books.cct.cctpy.cctpy import *
-except ModuleNotFoundError:
-    pass
-
-try:
-    from books.cct.cctpy.cctpy_ext import *
-except ModuleNotFoundError:
-    pass
-
 R = 0.95
 
 bl = (
@@ -56,8 +46,8 @@ wagcct5_out = Wire.create_by_cct(agcct5_out)
 
 # 当前进行分析的 CCT
 delta_angle = -10  # 当 CCT 负 ksi 方向绕线时，写负数
-s_start = 0+delta_angle/2 - 25*360 + 40*360  # 起止 ksi
-s_end = -360*34-delta_angle/2 - 25*360 + 40*360
+s_start = 0+delta_angle/2 - 25*360 +40*360  # 起止 ksi
+s_end = -360*34-delta_angle/2 - 25*360+40*360
 s_number = 36*34  # 数目
 current_cct = agcct5_out  # 当前 CCT 和 wire
 固定坐标系 = True
@@ -91,22 +81,22 @@ def task(s):
             )
         )
 
-    # fon = current_wire.lorentz_force_on_wire(
-    #     s=BaseUtils.angle_to_radian(s),
-    #     delta_length=current_cct.small_r *
-    #     BaseUtils.angle_to_radian(delta_angle),
-    #     local_coordinate_point=lcp,
-    #     other_magnet=other_magnet
-    # )
-    fon = current_wire.pressure_on_wire_MPa(
+    fon = current_wire.lorentz_force_on_wire(
         s=BaseUtils.angle_to_radian(s),
         delta_length=current_cct.small_r *
         BaseUtils.angle_to_radian(delta_angle),
         local_coordinate_point=lcp,
-        other_magnet=other_magnet,
-        channel_width=3.2*MM,
-        channel_depth=11*MM
+        other_magnet=other_magnet
     )
+    # fon = current_wire.pressure_on_wire_MPa(
+    #     s=BaseUtils.angle_to_radian(s),
+    #     delta_length=current_cct.small_r *
+    #     BaseUtils.angle_to_radian(delta_angle),
+    #     local_coordinate_point=lcp,
+    #     other_magnet=other_magnet,
+    #     channel_width=3.2*MM,
+    #     channel_depth=11*MM
+    # )
     print(fon)
     return fon
 
@@ -141,7 +131,7 @@ if __name__ == "__main__":
             Plot2.legend('绕线方向', 'rib方向', '径向', font_size=18,
                          font_family="Microsoft YaHei")
 
-        Plot2.info('index', 'lorentz_force/N', '',
+        Plot2.info('index', 'lorentz_force/N', file_name,
                    font_size=18, font_family="Microsoft YaHei")
         # Plot2.info('index', 'pressure/MPa', '',
         #            font_size=18, font_family="Microsoft YaHei")

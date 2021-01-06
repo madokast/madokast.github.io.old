@@ -1,6 +1,11 @@
 """
 CCTPY 辅助功能，一般不必使用
 
+主要用于进行线圈洛伦兹力分析、压强分析
+为此建立了 Line3 和 Wire，表示任意连续三维曲线及其构成的导线
+
+本模块也用于 agcct_connector，构建 agcct 的连接段
+
 @Author 赵润晓
 """
 
@@ -10,7 +15,7 @@ from cctpy import *
 
 class Magnets(Magnet):
     """
-    多个磁铁
+    多个磁铁，仅仅就是放进数组
     """
 
     def __init__(self, *magnet) -> None:
