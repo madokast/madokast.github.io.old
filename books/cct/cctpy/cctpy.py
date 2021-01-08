@@ -9,6 +9,8 @@ v0.1.2      2020年12月28日 添加相空间粒子映射时，单位转换 conv
 v0.1.3      2021年1月4日 添加拉格朗日 4 点插值函数 BaseUtils.interpolate_lagrange
             2021年1月5日 新增计算两直线交点的函数 StraightLine2.intersecting_point
             2021年1月6日 新增计算直线一般式方程的方法 StraightLine2.straight_line_equation
+            2021年1月7日 新增查看点 viewed_point 是不是在右边 StraightLine2.is_on_right
+            2021年1月7日 给 Line2.direct_at 添加粗略实现
 
 @Author 赵润晓
 """
@@ -729,10 +731,16 @@ class Line2:
         s 长度量，曲线上 s 位置
 
         Returns s 位置处，曲线的方向
+
+        refactor v0.1.3 添加粗略实现
         -------
 
         """
-        raise NotImplementedError
+        delta = 1e-7
+        p1 = self.point_at(s)
+        p2 = self.point_at(s+delta)
+        return p2-p1
+
 
     def right_hand_side_point(self, s: float, d: float) -> P2:
         """
@@ -1053,6 +1061,30 @@ class StraightLine2(Line2):
         return cp, ka, kb
 
 
+    @staticmethod
+    def is_on_right(view_point:P2,view_direct:P2,viewed_point:P2)->int:
+        """
+        查看点 viewed_point 是不是在右边
+        观察点为 view_point 观测方向为 view_direct
+
+        返回值
+        1  在右侧
+        0  在正前方或者正后方
+        -1 在左侧
+        """
+        right_direct = view_direct.copy().rotate(BaseUtils.angle_to_radian(-90))
+        relative_position = viewed_point-view_point
+
+        k = right_direct*relative_position
+
+        if k>0:
+            return 1
+        elif k<0:
+            return -1
+        else:
+            return 0
+    
+
 class ArcLine2(Line2):
     """
     二维有向圆弧段
@@ -1187,6 +1219,17 @@ class Trajectory(Line2):
         self.__length = first_line.get_length()
         self.__point_at_error_happen = False  # 是否发生 point_at 错误
         self.__aperture_objrcts = []  # 用于绘制孔径轮廓，since 0.1.1
+
+    def add_line2(self,line2:Line2)-> "Trajectory":
+        """
+        尾接任意二维曲线
+        不判断是否和当前轨迹相接、相切
+
+        since v0.1.3
+        """
+        self.__trajectoryList.append(line2)
+        self.__length += line2.get_length()
+
 
     def add_strait_line(self, length: float) -> "Trajectory":
         """
@@ -4329,6 +4372,8 @@ class BaseUtils:
             return rad * 180.0 / math.pi
         elif isinstance(rad, List):
             return [BaseUtils.radian_to_angle(d) for d in rad]
+        elif isinstance(rad,numpy.ndarray):
+            return numpy.array([BaseUtils.radian_to_angle(d) for d in rad])
         else:
             raise NotImplementedError
 
@@ -5773,10 +5818,9 @@ if __name__ == "__main__":
     if True:
         BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
 
-        data = [5.105, 	58.973 ,	89.902, 	96.877 ,	99.592 ,
-        	93.596 ,	63.308 ,	80.454 ,	9552.681 ,	-7459.877 ,
-            	25.000,	40.000, 	34.000
-                ]
+        data = [1.708 ,-94.893 ,	81.576 ,	90.961 	,85.602 ,	
+        98.831 ,	79.967, 	96.727 	,9467.295 ,
+        	-4961.334 	,23.000 ,	54.000, 	47.000 ]
 
         gantry = HUST_SC_GANTRY(
             qs3_gradient=data[0],

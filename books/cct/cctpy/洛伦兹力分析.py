@@ -8,12 +8,13 @@ bl = (
     .first_drift(P2.y_direct(), 1)
     .append_agcct(
         big_r=R,
-        small_rs=[128*MM, 113*MM, 98*MM, 83*MM],
+        small_rs=[128*MM + 9.5*MM, 113*MM + 9.5 *
+                  MM, 98*MM + 9.5*MM, 83*MM + 9.5*MM],
         bending_angles=[17.05, 27.27, 23.18],  # [15.14, 29.02, 23.34]
-        tilt_angles=[[30, 87.453,	92.142, 	90.667],
-                     [94.344, 30, 73.471,	82.190]],
+        tilt_angles=[[30, 87.076, 91.829, 85.857],
+                     [101.317, 30, 75.725, 92.044]],
         winding_numbers=[[128], [25, 40, 34]],
-        currents=[9426.734, -5626.101],
+        currents=[9536.310, -6259.974],
         disperse_number_per_winding=36
     ).append_drift(1)
 )
@@ -46,12 +47,12 @@ wagcct5_out = Wire.create_by_cct(agcct5_out)
 
 # 当前进行分析的 CCT
 delta_angle = -10  # 当 CCT 负 ksi 方向绕线时，写负数
-s_start = 0+delta_angle/2 - 25*360 +40*360  # 起止 ksi
-s_end = -360*34-delta_angle/2 - 25*360+40*360
+s_start = 0+delta_angle/2 - 25*360+40*360  # 起止 ksi
+s_end = -360*34-delta_angle/2-25*360+40*360
 s_number = 36*34  # 数目
 current_cct = agcct5_out  # 当前 CCT 和 wire
-固定坐标系 = True
-file_name = f'./四极CCT第3段外层{"固定" if 固定坐标系 else "滑动"}坐标系-洛伦兹力.txt'
+固定坐标系 = False
+file_name = f'./四极CCT第3段外层{"固定" if 固定坐标系 else "滑动"}坐标系-压强.txt'
 
 if False:
     # 保存代码
@@ -81,22 +82,22 @@ def task(s):
             )
         )
 
-    fon = current_wire.lorentz_force_on_wire(
-        s=BaseUtils.angle_to_radian(s),
-        delta_length=current_cct.small_r *
-        BaseUtils.angle_to_radian(delta_angle),
-        local_coordinate_point=lcp,
-        other_magnet=other_magnet
-    )
-    # fon = current_wire.pressure_on_wire_MPa(
+    # fon = current_wire.lorentz_force_on_wire(
     #     s=BaseUtils.angle_to_radian(s),
     #     delta_length=current_cct.small_r *
     #     BaseUtils.angle_to_radian(delta_angle),
     #     local_coordinate_point=lcp,
-    #     other_magnet=other_magnet,
-    #     channel_width=3.2*MM,
-    #     channel_depth=11*MM
+    #     other_magnet=other_magnet
     # )
+    fon = current_wire.pressure_on_wire_MPa(
+        s=BaseUtils.angle_to_radian(s),
+        delta_length=current_cct.small_r *
+        BaseUtils.angle_to_radian(delta_angle),
+        local_coordinate_point=lcp,
+        other_magnet=other_magnet,
+        channel_width=3.2*MM,
+        channel_depth=11*MM
+    )
     print(fon)
     return fon
 
@@ -131,8 +132,8 @@ if __name__ == "__main__":
             Plot2.legend('绕线方向', 'rib方向', '径向', font_size=18,
                          font_family="Microsoft YaHei")
 
-        Plot2.info('index', 'lorentz_force/N', file_name,
-                   font_size=18, font_family="Microsoft YaHei")
-        # Plot2.info('index', 'pressure/MPa', '',
+        # Plot2.info('index', 'lorentz_force/N', file_name,
         #            font_size=18, font_family="Microsoft YaHei")
+        Plot2.info('index', 'pressure/MPa', '',
+                   font_size=18, font_family="Microsoft YaHei")
         Plot2.show()

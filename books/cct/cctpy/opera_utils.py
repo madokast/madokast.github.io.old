@@ -328,13 +328,12 @@ class OperaFieldTableMagnet(Magnet):
 
 
 if __name__ == "__main__":
-    if False:
+    if True:
         # 2020 年参数
         # data = [-8.085,73.808,80.988,94.383,91.650,106.654,67.901,90.941,9488.615,-7334.914,24,46,37]
 
         # 2021.1.1 参数
-        data = [5.573, 	-44.622,	87.453,	92.142, 	90.667, 	94.344,
-                73.471,	82.190 	, 9426.734,	-5626.101,	25.000, 	40.000,	34.000]
+        data = [4.378,-90.491,87.076,91.829,85.857,101.317,75.725,92.044,9536.310,-6259.974,25,40,34]
 
         gantry = HUST_SC_GANTRY(
             qs3_gradient=data[0],
@@ -349,6 +348,28 @@ if __name__ == "__main__":
             agcct3_bending_angle=-67.5*(data[10])/(data[10]+data[11]+data[12]),
             agcct4_bending_angle=-67.5*(data[11])/(data[10]+data[11]+data[12]),
             agcct5_bending_angle=-67.5*(data[12])/(data[10]+data[11]+data[12]),
+
+
+            DL1=0.9007765,
+            GAP1=0.4301517,
+            GAP2=0.370816,
+            qs1_length=0.2340128,
+            qs1_aperture_radius=60 * MM,
+            qs1_gradient=0.0,
+            qs1_second_gradient=0.0,
+            qs2_length=0.200139,
+            qs2_aperture_radius=60 * MM,
+            qs2_gradient=0.0,
+            qs2_second_gradient=0.0,
+
+            DL2=2.35011,
+            GAP3=0.43188,
+            qs3_length=0.24379,
+
+            agcct345_inner_small_r=83 * MM + 9.5*MM,
+            agcct345_outer_small_r=98 * MM + 9.5*MM,  # 83+15
+            dicct345_inner_small_r=114 * MM + 9.5*MM,  # 83+30+1
+            dicct345_outer_small_r=130 * MM + 9.5*MM,  # 83+45 +2
         )
 
         bl_all = gantry.create_beamline()
@@ -375,6 +396,6 @@ if __name__ == "__main__":
         b8s_list.extend([Brick8s.create_by_cct(
             c, 3.2*MM, 11*MM, 'agcct', 10) for c in agccts])
 
-        operafile = open("opera0101.txt", "w")
+        operafile = open("opera0106.cond", "w")
         operafile.write(OperaConductor.to_opera_cond_script(b8s_list))
         operafile.close()

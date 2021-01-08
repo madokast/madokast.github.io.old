@@ -15,12 +15,12 @@ product_data_current = [795, 620, 445, 275] # r = 1.25
 product_data_magnet = [6, 7, 8, 9] # r = 1.25
 
 # 总电流
-current_dicct = 9426.734 #9488.615
-current_agcct = 5626.101 #7334.914
+current_dicct = 9536.310 #9426.734 #9488.615
+current_agcct = 6259.974 #5626.101 #7334.914
 
 # 最大磁场
-max_magnet_dicct = 3.78 #4.102784
-max_magnet_agcct = 3.82 #4.596925
+max_magnet_dicct = 4.05 #3.78 #4.102784
+max_magnet_agcct = 4.27 #3.82 #4.596925
 
 # 电流密度，注意除总截面积而不是线槽面积
 # current_density_dicct = current_dicct / line_cross_section / line_number
@@ -45,7 +45,7 @@ work_line(current_agcct / (2*8), max_magnet_agcct, 636) # 640
 # work_line(current_agcct / (2*5), max_magnet_agcct, 1000) # 640
 
 # work_line(current_dicct / (2*8), max_magnet_dicct, 1000) # 802
-work_line(current_dicct / (2*8), max_magnet_dicct, 874) # 802
+work_line(current_dicct / (2*8), max_magnet_dicct, 845) # 802
 # work_line(current_dicct / (2*6), max_magnet_dicct, 1000) # 802
 # work_line(current_dicct / (2*5), max_magnet_dicct, 1000) # 802
 
