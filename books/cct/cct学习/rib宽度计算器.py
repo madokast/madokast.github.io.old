@@ -8,11 +8,11 @@ MM = 0.001
 def dicct_outer():
 
     R = 0.95
-    r = 128*MM
+    r = 139.5*MM#128*MM
     bend_angle = 67.5
     wind_number = 128
-    tilt_angles = [30,80.988,94.383,91.650] # [106.654, 30,67.901,90.941]
-    rib_width = 4*MM
+    tilt_angles = [30,87,92,86] # [106.654, 30,67.901,90.941]
+    rib_width = 3.2*MM
 
     ######################################
 
@@ -57,6 +57,8 @@ def dicct_outer():
     # plot
     ksis = np.linspace(0, 2*math.pi, 360)
     wind_dis = [wind_distance(ksi)/MM-rib_width/MM for ksi in ksis]
+    print('dicct out',min(wind_dis))
+    print('dicct out',max(wind_dis))
     plt.plot(ksis/math.pi*180,wind_dis,'k-')
     plt.xticks(np.arange(0,360+60,60))
 
@@ -64,11 +66,11 @@ def dicct_outer():
 def dicct_inner():
 
     R = 0.95
-    r = 113*MM
+    r = 123.5*MM#113*MM
     bend_angle = 67.5
     wind_number = 128
-    tilt_angles = [30,80.988,94.383,91.650] # [106.654, 30,67.901,90.941]
-    rib_width = 4*MM
+    tilt_angles =[30,87,92,86] # [106.654, 30,67.901,90.941]
+    rib_width = 3.2*MM
 
     ######################################
 
@@ -113,6 +115,8 @@ def dicct_inner():
     # plot
     ksis = np.linspace(0, 2*math.pi, 360)
     wind_dis = [wind_distance(ksi)/MM-rib_width/MM for ksi in ksis]
+    print('dicct in',min(wind_dis))
+    print('dicct in',max(wind_dis))
     plt.plot(ksis/math.pi*180,wind_dis,'k-')
     plt.xticks(np.arange(0,360+60,60))
 
@@ -120,11 +124,11 @@ def dicct_inner():
 def agcct_inner():
 
     R = 0.95
-    r = 83*MM
+    r = 92.5*MM
     bend_angle = 67.5
-    wind_number = 128
-    tilt_angles = [106.654, 30,67.901,90.941]
-    rib_width = 4*MM
+    wind_number = 99
+    tilt_angles = [101, 30,76,92]
+    rib_width = 3.2*MM
 
     ######################################
 
@@ -169,17 +173,19 @@ def agcct_inner():
     # plot
     ksis = np.linspace(0, 2*math.pi, 360)
     wind_dis = [wind_distance(ksi)/MM-rib_width/MM for ksi in ksis]
+    print('agcct out',min(wind_dis))
+    print('agcct out',max(wind_dis))
     plt.plot(ksis/math.pi*180,wind_dis,'r-')
     plt.xticks(np.arange(0,360+60,60))
 
 def agcct_outer():
 
     R = 0.95
-    r = 98*MM
+    r = 107.5*MM
     bend_angle = 67.5
-    wind_number = 128
-    tilt_angles = [106.654, 30,67.901,90.941]
-    rib_width = 4*MM
+    wind_number = 99
+    tilt_angles = [101, 30,76,92]
+    rib_width = 3.2*MM
 
     ######################################
 
@@ -224,6 +230,8 @@ def agcct_outer():
     # plot
     ksis = np.linspace(0, 2*math.pi, 360)
     wind_dis = [wind_distance(ksi)/MM-rib_width/MM for ksi in ksis]
+    print('agcct out',max(wind_dis))
+    print('agcct out',min(wind_dis))
     plt.plot(ksis/math.pi*180,wind_dis,'r-')
     plt.xticks(np.arange(0,360+60,60))
 
