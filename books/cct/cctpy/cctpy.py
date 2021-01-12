@@ -11,6 +11,7 @@ v0.1.3      2021年1月4日 添加拉格朗日 4 点插值函数 BaseUtils.inter
             2021年1月6日 新增计算直线一般式方程的方法 StraightLine2.straight_line_equation
             2021年1月7日 新增查看点 viewed_point 是不是在右边 StraightLine2.is_on_right
             2021年1月7日 给 Line2.direct_at 添加粗略实现
+            2021年1月9日 无依赖拷贝坐标系 LocalCoordinateSystem.copy()，类型转换 CCT.as_cct()  P3.as_p3()
 
 @Author 赵润晓
 """
@@ -512,6 +513,14 @@ class P3:
         """
         return P3(random.random(), random.random(), random.random())
 
+    @staticmethod
+    def as_p3(anything)->'P3':
+        """
+        伪类型转换
+        用于 IDE 智能提示
+        """
+        return anything
+
 
 class LocalCoordinateSystem:
     """
@@ -674,6 +683,19 @@ class LocalCoordinateSystem:
 
         """
         return LocalCoordinateSystem()
+
+
+    def copy(self:"LocalCoordinateSystem")-> "LocalCoordinateSystem":
+        """
+        无依赖拷贝坐标系
+
+        since v0.1.3
+        """
+        return LocalCoordinateSystem(
+            location=self.location.copy(),
+            x_direction=self.XI.copy(),
+            z_direction=self.ZI.copy()
+        )
 
 
 class ValueWithDistance(Generic[T]):
@@ -2347,7 +2369,7 @@ class ParticleRunner:
     @staticmethod
     def run_only(
             p: Union[RunningParticle, List[RunningParticle]], m: Magnet, length: float, footstep: float = 20 * MM,
-            concurrency_level: int = 1
+            concurrency_level: int = 1,report:bool=True
     ) -> Union[RunningParticle, List[RunningParticle]]:
         """
         让粒子 p 在磁场 m 中运动 length 距离，步长 footstep
@@ -2398,7 +2420,8 @@ class ParticleRunner:
                 param_list=[
                     [this_p, m, length, footstep] for this_p in p
                 ],
-                concurrency_level=concurrency_level
+                concurrency_level=concurrency_level,
+                report = report
             )
             particle_number = len(p)
             for i in range(particle_number):
@@ -3553,6 +3576,16 @@ class CCT(Magnet, ApertureObject):
             length += (p1-p0).length()
         return length*line_number
 
+    def as_cct(anything)->'CCT':
+        """
+        仿佛是类型转换
+        实际啥也没做
+        但是 IDE 就能根据返回值做代码提示了
+
+        since v0.1.3
+        """
+        return anything
+
 
 class QS(Magnet, ApertureObject):
     """
@@ -3810,7 +3843,8 @@ class Beamline(Line2, Magnet, ApertureObject):
             s: float = 0.0,
             length: Optional[float] = None,
             footstep: float = 10 * MM,
-            concurrency_level: int = 1
+            concurrency_level: int = 1,
+            report:bool=True
     ) -> Tuple[List[P2], List[P2]]:
         """
         束流跟踪，运行一个相椭圆，返回一个长度 2 的元素，表示相空间 x-xp 平面和 y-yp 平面上粒子投影（单位 mm / mrad）
@@ -3863,7 +3897,8 @@ class Beamline(Line2, Magnet, ApertureObject):
         # run
         # refactor v0.1.1 合并计算
         ParticleRunner.run_only(
-            p=rp_x + rp_y, m=self, length=length, footstep=footstep, concurrency_level=concurrency_level
+            p=rp_x + rp_y, m=self, length=length, footstep=footstep, concurrency_level=concurrency_level,
+            report=report
         )
 
         pp_x_end = PhaseSpaceParticle.create_from_running_particles(
@@ -4434,7 +4469,7 @@ class BaseUtils:
         delta 即 Δ，f' = (f(x+Δ)-f(x))/Δ
         """
         def d(x: float) -> Union[float, P2, P3]:
-            return (func(x+delta)-func(x))/delta
+            return (func(x+delta/2)-func(x-delta/2))/delta
 
         return d
 
@@ -4564,8 +4599,12 @@ class BaseUtils:
         cls.__I_AM_SURE_MY_CODE_CLOSED_IN_IF_NAME_EQUAL_MAIN = True
 
     @classmethod
-    def submit_process_task(cls, task: Callable[..., T], param_list: List[List], concurrency_level: Optional[int] = None) -> \
-            List[T]:
+    def submit_process_task(cls, 
+        task: Callable[..., T],
+        param_list: List[List], 
+        concurrency_level: Optional[int] = None,
+        report:bool=True
+        ) -> List[T]:
         """
         提交任务多进程并行
         task 要运行的任务，是一个函数
@@ -4587,13 +4626,15 @@ class BaseUtils:
 
         if concurrency_level is None:
             concurrency_level = os.cpu_count()
-        print(f"处理并行任务，任务数目{len(param_list)}，并行等级{concurrency_level}")
+        if report:
+            print(f"处理并行任务，任务数目{len(param_list)}，并行等级{concurrency_level}")
         start = time.time()
         pool = multiprocessing.Pool(processes=concurrency_level)  # 开启一次性进程池
         r = pool.starmap(task, param_list)  # 执行任务
         pool.close()  # 停止接受任务
         pool.join()  # 等待完成
-        print(f"任务完成，用时{time.time() - start}秒")
+        if report:
+            print(f"任务完成，用时{time.time() - start}秒")
         return r
 
     class Ellipse:
@@ -4958,7 +4999,7 @@ class Plot3:
                            axis_lengths[2]], describe=describe)
 
     @staticmethod
-    def set_center(center: P3, cube_size: float) -> None:
+    def set_center(center: P3=P3.origin(), cube_size: float=1.0) -> None:
         """
         设置视界中心和范围
         因为范围是一个正方体，所以这个方法类似于 Plot2.equal()
@@ -5669,7 +5710,7 @@ def beamline_phase_ellipse_multi_delta(bl: Beamline, particle_number: int,
                                        dps: List[float], describles: str = ['r-', 'y-', 'b-', 'k-', 'g-', 'c-', 'm-'],
                                        foot_step: float = 10*MM):
     if len(dps) > len(describles):
-        raise ValueError(
+        print(
             f'describles(size={len(describles)}) 长度应大于等于 dps(size={len(dps)})')
     xs = []
     ys = []
@@ -5679,7 +5720,8 @@ def beamline_phase_ellipse_multi_delta(bl: Beamline, particle_number: int,
             y_sigma_mm=3.5, yp_sigma_mrad=7.5,
             delta=dp, particle_number=particle_number,
             kinetic_MeV=215, concurrency_level=16,
-            footstep=foot_step
+            footstep=foot_step,
+            report=False
         )
         xs.append(x + [x[0]])
         ys.append(y + [y[0]])
@@ -5818,9 +5860,9 @@ if __name__ == "__main__":
     if True:
         BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
 
-        data = [1.708 ,-94.893 ,	81.576 ,	90.961 	,85.602 ,	
-        98.831 ,	79.967, 	96.727 	,9467.295 ,
-        	-4961.334 	,23.000 ,	54.000, 	47.000 ]
+        data = [4.378 ,-90.491 ,	87.076,91.829,85.857 ,	
+        101.317,75.725,92.044,9536.310,
+        	-6259.974,25,40,34]
 
         gantry = HUST_SC_GANTRY(
             qs3_gradient=data[0],
@@ -5867,7 +5909,7 @@ if __name__ == "__main__":
         bl = gantry.create_second_bending_part(sp, sd)
 
         beamline_phase_ellipse_multi_delta(
-            bl, 8, [-0.05, -0.025, 0, +0.025, 0.05]
+            bl, 8, BaseUtils.linspace(-0.1,0.1,21)#[-0.05, -0.025, 0, +0.025, 0.05]
         )
 
         plt.show()

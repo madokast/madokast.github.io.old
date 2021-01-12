@@ -6,11 +6,21 @@ CCTPY 辅助功能，一般不必使用
 
 本模块也用于 agcct_connector，构建 agcct 的连接段
 
+2021年1月9日 新增 Function_Part ，用于构建连接后的 agcct
+
 @Author 赵润晓
 """
 
 import math
+from typing import Any, TypeVar
 from cctpy import *
+
+_T = TypeVar("_T")
+
+try:
+    from books.cct.cctpy.cctpy import *
+except:
+    pass
 
 
 class Magnets(Magnet):
@@ -233,10 +243,10 @@ class Wire(Magnet):
         return p, local_coordinate_point.vector_to_local_coordinate(F)
 
     def pressure_on_wire_MPa(self, s: float, delta_length: float,
-                         local_coordinate_point: LocalCoordinateSystem,
-                         channel_width: float, channel_depth: float,
-                         other_magnet: Magnet = Magnet.no_magnet(),
-                         ) -> Tuple[P3, P3]:
+                             local_coordinate_point: LocalCoordinateSystem,
+                             channel_width: float, channel_depth: float,
+                             other_magnet: Magnet = Magnet.no_magnet(),
+                             ) -> Tuple[P3, P3]:
         """
         计算压强，默认为 CCT
 
@@ -268,7 +278,7 @@ class Wire(Magnet):
             y=f.y/(winding_direct_length*channel_depth),
             z=f.z/(winding_direct_length*channel_width)
         )/1e6
-        
+
         return p, pressure
 
     @staticmethod
@@ -291,3 +301,67 @@ class Wire(Magnet):
             delta_length=cct.small_r *
             BaseUtils.angle_to_radian(360/cct.winding_number)
         )
+
+
+class Function_Part:
+    """
+    函数段
+    即包含一个函数 func，和自变量的起始值和终止值
+
+
+    since 2021年1月9日
+    """
+
+    def __init__(self, func: Callable[[float], _T], start: float, end: float, scale: float = 1.0) -> None:
+        self.func = func
+        self.start = start
+        self.end = end
+        self.scale = scale
+
+        self.length = abs(start-end) * self.scale
+
+        # forward 为正数，说明自变量向着增大的方向，即 end > start
+        self.forward = start < end
+
+    def valve_at(self, x: float, err=1e-6) -> _T:
+        """
+        注意，此时函数的起点变成了 0
+        取值范围为 [0, self.length]
+        """
+        x = x/self.scale
+        if x > self.length+err or x < -err:
+            print(f"Function_Part：自变量超出范围, x={x}, length={self.length}")
+        return self.func(self.start + (
+            x if self.forward else (-x)
+        ))
+
+    def append(self, func: Callable[[float], _T], start: float, end: float, scale: float = 1.0) -> 'Function_Part':
+        """
+        原函数段尾加新的函数
+
+        这代码写得极其精妙
+        """
+        appended = Function_Part(func, start, end, scale)
+
+        def fun_linked(t):
+            if t < self.length:
+                return self.valve_at(t)
+            else:
+                return appended.valve_at(t-self.length)
+
+        return Function_Part(fun_linked, 0, self.length+appended.length)
+
+
+if __name__ == "__main__":
+    if True:  # test Function_Part
+        fp = Function_Part(lambda x: x, 5, 2)
+        print(fp.valve_at(0))
+        print(fp.valve_at(1))
+
+        fp = fp.append(lambda x: x**2, 0, 5)
+        fp = fp.append(lambda x: -x**2, 0, 5, 20)
+        fp = fp.append(lambda x: x**2, 0, 5)
+        fp = fp.append(lambda x: -x**2, 0, 5, 20)
+        Plot2.plot([P2(x, fp.valve_at(x))
+                    for x in BaseUtils.linspace(0, fp.length, 100)])
+        Plot2.show()

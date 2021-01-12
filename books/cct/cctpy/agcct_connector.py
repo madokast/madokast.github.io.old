@@ -2,8 +2,13 @@
 agcct 连接段的构建，尽可能的自动化
 2021年1月7日 连接成功！
 2021年1月8日 改正bug，后偏转段CCT连接完成
+             注意，存在重大 bug，即认为两个连接点处的切向，方向相反，实际上是错的！
+             在当前一般配置的 CCT 中，切向方向大约相差 0.5 度
+             这是什么概念呢？把 CCT 一匝分为 720 段，才能达到相接处 0.5 度变化。
+             鉴于 0.5 度似乎可以忽略，暂时就不优化了（因为连接过程很复杂）
+             先放一放
 
-关于 agcct 连接的详细说明，见文档 
+关于 agcct 连接的详细说明，见文档 cct架构分析/AGCCT连接问题.ipynd
 @Author 赵润晓
 """
 
@@ -108,6 +113,13 @@ class AGCCT_CONNECTOR(Magnet):
             )
 
         self.connector_line_in_z_Θ = connector_line_in_z_Θ
+        self.length_in_z_Θ = connector_line_in_z_Θ.get_length()
+        self.p2_function = lambda t: P2(
+            x=self.connector_line_in_z_Θ.point_at(t).y/agcct1.small_r,
+            y=self.connector_line_in_z_Θ.point_at(t).x/agcct1.big_r
+        )
+        self.p2_function_start = 0
+        self.p2_function_end = self.length_in_z_Θ
 
         # z-Ξ 转到 ksi - phi 坐标系
         # z = φR

@@ -297,5 +297,5 @@ if True:
     ax3.text(0, 0, r * 2, "x", (0, 0, 0), fontsize=15)
 
 
-ani.save('books\cct\img\F01左二维有圆柱三维_AGCCT设计.gif', writer='imagemagick', fps=100)
+# ani.save('books\cct\img\F01左二维有圆柱三维_AGCCT设计.gif', writer='imagemagick', fps=100)
 plt.show()
