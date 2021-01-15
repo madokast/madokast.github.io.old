@@ -14,6 +14,7 @@ opera 相关工具类
 
 try:
     from books.cct.cctpy.cctpy import *
+    from books.cct.cctpy.cctpy_ext import *
 except:
     pass
 
@@ -203,7 +204,7 @@ class Brick8s:
 
         # 副法线方向
         def second_normal_direc(ksi):
-            return tangential_direct(ksi)@main_normal_direct(ksi)
+            return (tangential_direct(ksi)@main_normal_direct(ksi)).normalize()
 
         def channel_path1(ksi):
             return (path3(ksi)
@@ -328,7 +329,7 @@ class OperaFieldTableMagnet(Magnet):
 
 
 if __name__ == "__main__":
-    if True:
+    if False: # 导出 cond 文件
         # 2020 年参数
         # data = [-8.085,73.808,80.988,94.383,91.650,106.654,67.901,90.941,9488.615,-7334.914,24,46,37]
 
@@ -392,10 +393,98 @@ if __name__ == "__main__":
         # Plot2.show()
 
         b8s_list = [Brick8s.create_by_cct(
-            c, 3.2*MM, 11*MM, 'dicct', 10) for c in diccts]
+            c, 3.2*MM, 11*MM, 'dicct', 360) for c in diccts]
         b8s_list.extend([Brick8s.create_by_cct(
-            c, 3.2*MM, 11*MM, 'agcct', 10) for c in agccts])
+            c, 3.2*MM, 11*MM, 'agcct', 360) for c in agccts])
 
-        operafile = open("opera0106.cond", "w")
+        operafile = open("opera0115.cond", "w")
         operafile.write(OperaConductor.to_opera_cond_script(b8s_list))
         operafile.close()
+
+
+    if True:# opera 对比研究
+        data = [4.378,-90.491,87.076,91.829,85.857,101.317,75.725,92.044,9536.310,-6259.974,25,40,34]
+
+        gantry = HUST_SC_GANTRY(
+            qs3_gradient=data[0],
+            qs3_second_gradient=data[1],
+            dicct345_tilt_angles=[30, data[2], data[3], data[4]],
+            agcct345_tilt_angles=[data[5], 30, data[6], data[7]],
+            dicct345_current=data[8],
+            agcct345_current=data[9],
+            agcct3_winding_number=data[10],
+            agcct4_winding_number=data[11],
+            agcct5_winding_number=data[12],
+            agcct3_bending_angle=-67.5*(data[10])/(data[10]+data[11]+data[12]),
+            agcct4_bending_angle=-67.5*(data[11])/(data[10]+data[11]+data[12]),
+            agcct5_bending_angle=-67.5*(data[12])/(data[10]+data[11]+data[12]),
+
+
+            DL1=0.9007765,
+            GAP1=0.4301517,
+            GAP2=0.370816,
+            qs1_length=0.2340128,
+            qs1_aperture_radius=60 * MM,
+            qs1_gradient=0.0,
+            qs1_second_gradient=0.0,
+            qs2_length=0.200139,
+            qs2_aperture_radius=60 * MM,
+            qs2_gradient=0.0,
+            qs2_second_gradient=0.0,
+
+            DL2=2.35011,
+            GAP3=0.43188,
+            qs3_length=0.24379,
+
+            agcct345_inner_small_r=83 * MM + 9.5*MM,
+            agcct345_outer_small_r=98 * MM + 9.5*MM,  # 83+15
+            dicct345_inner_small_r=114 * MM + 9.5*MM,  # 83+30+1
+            dicct345_outer_small_r=130 * MM + 9.5*MM,  # 83+45 +2
+
+            part_per_winding=360
+        )
+
+        bl_all = gantry.create_beamline()
+
+        f = gantry.first_bending_part_length()
+
+        sp = bl_all.trajectory.point_at(f)
+        sd = bl_all.trajectory.direct_at(f)
+
+        bl = gantry.create_second_bending_part(sp, sd)
+
+        diccts = bl.magnets[0:2]
+        agccts = bl.magnets[2:8]
+        ccts = Magnets(*diccts).add_all(agccts)
+        
+
+        # 局部坐标系
+        lcs = CCT.as_cct(diccts[0]).local_coordinate_system
+        for cct in ccts.to_list():
+            print(lcs == CCT.as_cct(cct).local_coordinate_system)
+        
+        origin_lcs = P3.origin()
+        origin_gcs = lcs.point_to_global_coordinate(origin_lcs)
+        print(origin_gcs)
+        # [6.640302200026097, 2.7739506645753815, 0.0]
+
+        arc = ArcLine2(
+            starting_phi=BaseUtils.angle_to_radian(-120),
+            center=P2.origin(),
+            radius=0.95,
+            total_phi=BaseUtils.angle_to_radian(180),
+            clockwise=False
+        )
+
+        ms = []
+        for s in BaseUtils.linspace(0,0.95*BaseUtils.angle_to_radian(180),721):
+            p = arc.point_at(s).to_p3()
+            p = lcs.point_to_global_coordinate(p) + P3(z=75*MM) # 上移动 75mm
+            m = ccts.magnetic_field_at(p)
+            print(BaseUtils.radian_to_angle(s/0.95),m.z)
+            ms.append(P2(s,m.z))
+        
+        Plot2.plot(ms)
+        Plot2.show()
+
+        # arc_ps = [arc.point_at(s) for s in BaseUtils.linspace(0,BaseUtils.angle_to_radian(180)*0.95,181)]

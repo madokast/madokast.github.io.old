@@ -35,6 +35,13 @@ class Magnets(Magnet):
         self.magnets.append(magnet)
         return self
 
+    def add_all(self, magnets: List[Magnet]) -> 'Magnets':
+        self.magnets.extend(magnets)
+        return self
+
+    def to_list(self)->List[Magnet]:
+        return self.magnets
+
     def remove(self,  magnet: Magnet) -> 'Magnets':
         self.magnets.remove(magnet)
         return self

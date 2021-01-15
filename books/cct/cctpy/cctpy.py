@@ -3164,6 +3164,10 @@ class CCT(Magnet, ApertureObject):
             # 每匝线圈离散电流元数目，数字越大计算精度越高
             disperse_number_per_winding: int = 120,
     ):
+        if bending_angle<0:
+            print(f"CCT 偏转角度应为正数，不能是 {bending_angle}，需要反向偏转的 CCT，"+
+            "应通过 starting_point_in_ksi_phi_coordinate，和 end_point_in_ksi_phi_coordinate 控制偏转方向"
+            )
         self.local_coordinate_system = local_coordinate_system
         self.big_r = float(big_r)
         self.small_r = float(small_r)
@@ -3459,7 +3463,7 @@ class CCT(Magnet, ApertureObject):
         """
         start_point: P2 = trajectory.point_at(s)
         arc_length: float = big_r * BaseUtils.angle_to_radian(bending_angle)
-        end_point: P2 = trajectory.point_at(s)
+        end_point: P2 = trajectory.point_at(s + arc_length) # 2021年1月15日 bug fixed
 
         midpoint0: P2 = trajectory.point_at(s + arc_length / 3 * 1)
         midpoint1: P2 = trajectory.point_at(s + arc_length / 3 * 2)
@@ -3476,18 +3480,21 @@ class CCT(Magnet, ApertureObject):
 
         start_direct: P2 = trajectory.direct_at(s)
         pos: int = StraightLine2(
-            1, start_direct, start_point).position_of(center)
+            # position_of 求点 p 相对于直线段的方位
+            # 返回值：
+            # 1  在右侧    # -1 在左侧    # 0  在直线段所在直线上
+            1.0, start_direct, start_point).position_of(center)
 
         lcs = None
         if pos == 0:
             raise ValueError(f"错误：圆心{center}在设计轨道{trajectory}上")
-        elif pos == 1:
+        elif pos == 1: # center 在 (start_direct, start_point) 右侧，因此逆时针偏转
             lcs = LocalCoordinateSystem.create_by_y_and_z_direction(
                 location=center.to_p3(),
                 y_direction=-start_direct.to_p3(),  # diff
                 z_direction=P3.z_direct(),
             )
-        else:
+        else: # pos = -1  # center 在 (start_direct, start_point) 左侧，因此顺时针偏转
             lcs = LocalCoordinateSystem.create_by_y_and_z_direction(
                 location=center.to_p3(),
                 y_direction=start_direct.to_p3(),  # diff
