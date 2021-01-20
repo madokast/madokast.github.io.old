@@ -9,6 +9,9 @@
 
 
 <style type="text/css">
+html{
+  zoom:1.5;
+}
     pre { line-height: 125%; margin: 0; }
 td.linenos pre { color: #000000; background-color: #f0f0f0; padding-left: 5px; padding-right: 5px; }
 span.linenos { color: #000000; background-color: #f0f0f0; padding-left: 5px; padding-right: 5px; }
@@ -14276,7 +14279,7 @@ a.anchor-link {
 <span class="kt">int</span> <span class="n">j</span> <span class="o">=</span> <span class="n">threadIdx</span><span class="p">.</span><span class="n">y</span><span class="p">;</span> <span class="c1">// 获取线程 y 方向编号</span>
 <span class="n">new_img</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">old_img</span><span class="p">[</span><span class="n">i</span><span class="o">/</span><span class="n">c</span><span class="p">][</span><span class="n">j</span><span class="o">/</span><span class="n">c</span><span class="p">];</span>
 </pre></div>
-<p>代码执行的逻辑是这样的：<strong>事先给 GPU 中的线程编号，编号可以是1维，也可以2为或3维，这里很明显是2维编号，即每个线程的编号是一个二元数对（i,j），这些线程同时执行上面的三横代码，互相分工，完成图片的缩放。</strong></p>
+<p>代码执行的逻辑是这样的：<strong>事先给 GPU 中的线程编号，编号可以是1维，也可以2维或3维，这里很明显是2维编号，即每个线程的编号是一个二元数对（i,j），这些线程同时执行上面的三横代码，互相分工，完成图片的缩放。</strong></p>
 <p>其中代码中 threadIdx.x 和 threadIdx.y 获取线程 2 个维度上的编号。</p>
 <p>例如编号（0, 0）的线程，他执行的代码是 new_img[0][0]=old_img[0/c][0/c]</p>
 <p>编号（100, 200）的线程，执行的代码是 new_img[100][200]=old_img[100/c][200/c]</p>
@@ -14351,17 +14354,17 @@ a.anchor-link {
 <span class="p">}</span>
 </pre></div>
 <p>如果要让 greet() 函数在 GPU 中运行，我们需要两步操作：</p>
-<ol>
+<ul>
 <li>指明 great() 函数的调用方式，在函数定义行的最前面加上 <code>__global__</code>，这表示<strong>函数由 CPU 调用并在 GPU 上执行</strong>。</li>
-</ol>
+</ul>
 <p><code>__global__</code> 是 CUDA 代码中的一个关键字，它定义了函数的调用者和执行者。类似的关键字还有<code>__device__</code>，表示<strong>函数由 GPU 调用并在 GPU 上执行。</strong></p>
-<ol>
+<ul>
 <li>指明 great() 函数执行时需要多少个线程，以及线程编号方式。在 main 函数中执行 great() 函数的语句是<code>greet();</code>，只要在函数名和后面的括号中插入<code>&lt;&lt;&lt;dim3(dx,dy,dz) ,dim3(tx,ty,tz)&gt;&gt;&gt;</code>即可。</li>
-</ol>
+</ul>
 <p>为了解释<code>&lt;&lt;&lt;dim3(dx,dy,dz) ,dim3(tx,ty,tz)&gt;&gt;&gt;</code>的意义，首先介绍 GPU 中线程的编号方式。因为 GPU 中线程数目很多，因此采用分层思想（就像学生们不是都在一个班，而是分布在不同班级），线程中的“班级”称为<strong>线程块</strong>，一个 GPU 中存在若干个<strong>线程块</strong>，<strong>线程块</strong>内存在若干个<strong>线程</strong>，这里的具体数目可以任意指定，不是固定的。</p>
 <p>另外<strong>线程块</strong>和块内的<strong>线程</strong>编号，可以采用一维、二维、三维的形式。</p>
 <p>示例一：<code>&lt;&lt;&lt;dim3(1),dim3(1)&gt;&gt;&gt;</code>表示函数执行时，启动 1 个<strong>线程块</strong>，每个<strong>线程块</strong>内 1 个<strong>线程</strong>，一维可以简写为 &lt;&lt;&lt;1,1&gt;&gt;&gt;</p>
-<p>示例一：<code>&lt;&lt;&lt;dim3(2,3,4) ,dim3(1,5,1)&gt;&gt;&gt;</code>表示函数执行时，启动 2<em>3</em>4 个<strong>线程块</strong>（共 24 个），每个<strong>线程块</strong>内 1<em>5</em>1 个<strong>线程</strong>。（共 5 个）</p>
+<p>示例一：<code>&lt;&lt;&lt;dim3(2,3,4) ,dim3(1,5,1)&gt;&gt;&gt;</code>表示函数执行时，启动 2*3*4 个<strong>线程块</strong>（共 24 个），每个<strong>线程块</strong>内 1*5*1 个<strong>线程</strong>。（共 5 个）</p>
 <p>修改后的程序如下：</p>
 <div class="highlight"><pre><span></span><span class="c1">// hello.cu</span>
 <span class="cp">#include</span> <span class="cpf">&lt;stdio.h&gt;</span><span class="cp"></span>
@@ -14380,7 +14383,7 @@ a.anchor-link {
 </ol>
 <p><img src="./img/A05nvcc01.jpg" width=70%></img></p>
 <ol>
-<li>在该目录下输入命令<code>nvcc hello.cu</code>。编译成功后，按照传统输出<code>a.exe</code>文件。（当然可以提前指定输出文件名，使用 -o 命令）</li>
+<li>在该目录下输入命令<code>nvcc hello.cu</code>。编译成功后，按照 C 编译器的传统输出<code>a.exe</code>文件。（当然可以提前指定输出文件名，使用 -o 命令）</li>
 </ol>
 <p><img src="./img/A05nvcc02.jpg" width=70%></img></p>
 <ol>
@@ -14394,7 +14397,7 @@ a.anchor-link {
 </div>
 <div class="jp-Cell-inputWrapper"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
-<h2 id="CUDA-&#32534;&#31243;&#26680;&#24515;&#30693;&#35782;&#28857;">CUDA &#32534;&#31243;&#26680;&#24515;&#30693;&#35782;&#28857;<a class="anchor-link" href="#CUDA-&#32534;&#31243;&#26680;&#24515;&#30693;&#35782;&#28857;">&#182;</a></h2><h3 id="&#32447;&#31243;&#32534;&#21495;">&#32447;&#31243;&#32534;&#21495;<a class="anchor-link" href="#&#32447;&#31243;&#32534;&#21495;">&#182;</a></h3><h3 id="CPU-&#21644;-GPU-&#25968;&#25454;&#20256;&#36755;">CPU &#21644; GPU &#25968;&#25454;&#20256;&#36755;<a class="anchor-link" href="#CPU-&#21644;-GPU-&#25968;&#25454;&#20256;&#36755;">&#182;</a></h3><h3 id="&#20849;&#20139;&#20869;&#23384;&#21644;&#32447;&#31243;&#21516;&#27493;">&#20849;&#20139;&#20869;&#23384;&#21644;&#32447;&#31243;&#21516;&#27493;<a class="anchor-link" href="#&#20849;&#20139;&#20869;&#23384;&#21644;&#32447;&#31243;&#21516;&#27493;">&#182;</a></h3>
+<h2 id="CUDA-&#32534;&#31243;&#26680;&#24515;&#30693;&#35782;&#28857;">CUDA &#32534;&#31243;&#26680;&#24515;&#30693;&#35782;&#28857;<a class="anchor-link" href="#CUDA-&#32534;&#31243;&#26680;&#24515;&#30693;&#35782;&#28857;">&#182;</a></h2><h3 id="&#32447;&#31243;&#32534;&#21495;&#21644;&#20219;&#21153;&#20998;&#37197;">&#32447;&#31243;&#32534;&#21495;&#21644;&#20219;&#21153;&#20998;&#37197;<a class="anchor-link" href="#&#32447;&#31243;&#32534;&#21495;&#21644;&#20219;&#21153;&#20998;&#37197;">&#182;</a></h3><h3 id="CPU-&#21644;-GPU-&#25968;&#25454;&#20256;&#36755;">CPU &#21644; GPU &#25968;&#25454;&#20256;&#36755;<a class="anchor-link" href="#CPU-&#21644;-GPU-&#25968;&#25454;&#20256;&#36755;">&#182;</a></h3><h3 id="&#20849;&#20139;&#20869;&#23384;&#21644;&#32447;&#31243;&#21516;&#27493;">&#20849;&#20139;&#20869;&#23384;&#21644;&#32447;&#31243;&#21516;&#27493;<a class="anchor-link" href="#&#20849;&#20139;&#20869;&#23384;&#21644;&#32447;&#31243;&#21516;&#27493;">&#182;</a></h3>
 </div>
 </div>
 <div class="jp-Cell-inputWrapper"><div class="jp-InputPrompt jp-InputArea-prompt">

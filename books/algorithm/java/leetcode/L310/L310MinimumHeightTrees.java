@@ -8,6 +8,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Map.Entry;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * 树是一个无向图，其中任何两个顶点只通过一条路径连接。 换句话说，一个任何没有简单环路的连通图都是一棵树。
@@ -29,15 +32,27 @@ import java.util.Set;
 public class L310MinimumHeightTrees {
     public static void main(String[] args) {
         L310MinimumHeightTrees l = new L310MinimumHeightTrees();
-        System.out.println(l.findMinHeightTrees(4, new int[][]{
-            new int[]{1,0},
-            new int[]{1,2},
-            new int[]{1,3}
-        }));
+        System.out.println(
+                l.findMinHeightTrees(4, new int[][] { new int[] { 1, 0 }, new int[] { 1, 2 }, new int[] { 1, 3 } }));
+
+        L310MinimumHeightTrees.Solution s = new L310MinimumHeightTrees.Solution();
+        System.out.println(
+                s.findMinHeightTrees(4, new int[][] { new int[] { 1, 0 }, new int[] { 1, 2 }, new int[] { 1, 3 } }));
+
+        System.out.println(s.findMinHeightTrees(4, new int[][] { new int[] { 3, 0 }, new int[] { 3, 1 },
+                new int[] { 3, 2 }, new int[] { 3, 4 }, new int[] { 4, 5 } })); // [[3,0],[3,1],[3,2],[3,4],[5,4]]
     }
 
+    /**
+     * 超时，利用高度计算
+     * 
+     * @param n     节点树
+     * @param edges 边界
+     * @return 中心点
+     */
     public List<Integer> findMinHeightTrees(int n, int[][] edges) {
-        if(n==1) return List.of(0);
+        if (n == 1)
+            return List.of(0);
         List<Integer> ret = new ArrayList<>();
         int minHeight = n;
         Set<Integer> nodeSet = new HashSet<>();
@@ -92,5 +107,81 @@ public class L310MinimumHeightTrees {
         }
 
         return height;
+    }
+
+    static class Solution {
+        public List<Integer> findMinHeightTrees(int n, int[][] edges) {
+            Map<Integer, Set<Integer>> paths = new HashMap<>();
+            Map<Integer, Integer> inDegree = new HashMap<>();
+            for (int[] edge : edges) {
+
+                int p = edge[0];
+                int q = edge[1];
+
+                Set<Integer> pr = paths.get(p);
+                if (pr == null)
+                    pr = new HashSet<>();
+                pr.add(q);
+                paths.put(p, pr);
+                inDegree.put(p, inDegree.getOrDefault(p, 0) + 1);
+
+                Set<Integer> qr = paths.get(q);
+                if (qr == null)
+                    qr = new HashSet<>();
+                qr.add(p);
+                paths.put(q, qr);
+                inDegree.put(q, inDegree.getOrDefault(q, 0) + 1);
+            }
+
+            System.out.println(paths);
+            System.out.println(inDegree);
+
+            Map<Integer, Set<Integer>> inDegreeRemap = new HashMap<>();
+            for (Entry<Integer, Integer> d : inDegree.entrySet()) {
+                Integer node = d.getKey();
+                Integer in = d.getValue();
+                Set<Integer> r = inDegreeRemap.get(in);
+                if (r == null)
+                    r = new HashSet<>();
+                r.add(node);
+                inDegreeRemap.put(in, r);
+            }
+
+            Set<Integer> last = IntStream.range(0, n).boxed().collect(Collectors.toSet());
+            while (!paths.isEmpty()) {
+                System.out.println("-------");
+                System.out.println(inDegreeRemap);
+                System.out.println(paths);
+                System.out.println(inDegree);
+                Set<Integer> deleted = new HashSet<>(inDegreeRemap.get(1));
+                last.removeAll(deleted);
+                if (last.isEmpty()) {
+                    last = deleted;
+                    break;
+                }
+                for (Integer node : deleted) { // 0 2 3
+                    Integer noded = paths.get(node).stream().findAny().get(); // 1
+                    paths.remove(node); // 0 2 3
+                    paths.get(noded).remove(node); // 1
+                    if (paths.get(noded).isEmpty())
+                        paths.remove(noded);
+
+                    Integer nodedInDegree = inDegree.get(noded);
+                    inDegree.put(node, 0);
+                    inDegree.put(noded, nodedInDegree - 1);
+
+                    inDegreeRemap.get(1).remove(node);
+                    inDegreeRemap.get(nodedInDegree).remove(noded);
+
+                    Set<Integer> nodedInDegreeRemap = inDegreeRemap.get(nodedInDegree - 1);
+                    if (nodedInDegreeRemap == null)
+                        nodedInDegreeRemap = new HashSet<>();
+                    nodedInDegreeRemap.add(noded);
+                    inDegreeRemap.put(nodedInDegree - 1, nodedInDegreeRemap);
+                }
+            }
+
+            return last.stream().sorted().collect(Collectors.toList());
+        }
     }
 }
