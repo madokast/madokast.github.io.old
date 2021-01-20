@@ -514,7 +514,7 @@ class P3:
         return P3(random.random(), random.random(), random.random())
 
     @staticmethod
-    def as_p3(anything)->'P3':
+    def as_p3(anything) -> 'P3':
         """
         伪类型转换
         用于 IDE 智能提示
@@ -684,8 +684,7 @@ class LocalCoordinateSystem:
         """
         return LocalCoordinateSystem()
 
-
-    def copy(self:"LocalCoordinateSystem")-> "LocalCoordinateSystem":
+    def copy(self: "LocalCoordinateSystem") -> "LocalCoordinateSystem":
         """
         无依赖拷贝坐标系
 
@@ -762,7 +761,6 @@ class Line2:
         p1 = self.point_at(s)
         p2 = self.point_at(s+delta)
         return p2-p1
-
 
     def right_hand_side_point(self, s: float, d: float) -> P2:
         """
@@ -1082,9 +1080,8 @@ class StraightLine2(Line2):
 
         return cp, ka, kb
 
-
     @staticmethod
-    def is_on_right(view_point:P2,view_direct:P2,viewed_point:P2)->int:
+    def is_on_right(view_point: P2, view_direct: P2, viewed_point: P2) -> int:
         """
         查看点 viewed_point 是不是在右边
         观察点为 view_point 观测方向为 view_direct
@@ -1099,13 +1096,13 @@ class StraightLine2(Line2):
 
         k = right_direct*relative_position
 
-        if k>0:
+        if k > 0:
             return 1
-        elif k<0:
+        elif k < 0:
             return -1
         else:
             return 0
-    
+
 
 class ArcLine2(Line2):
     """
@@ -1242,7 +1239,7 @@ class Trajectory(Line2):
         self.__point_at_error_happen = False  # 是否发生 point_at 错误
         self.__aperture_objrcts = []  # 用于绘制孔径轮廓，since 0.1.1
 
-    def add_line2(self,line2:Line2)-> "Trajectory":
+    def add_line2(self, line2: Line2) -> "Trajectory":
         """
         尾接任意二维曲线
         不判断是否和当前轨迹相接、相切
@@ -1251,7 +1248,6 @@ class Trajectory(Line2):
         """
         self.__trajectoryList.append(line2)
         self.__length += line2.get_length()
-
 
     def add_strait_line(self, length: float) -> "Trajectory":
         """
@@ -2369,7 +2365,7 @@ class ParticleRunner:
     @staticmethod
     def run_only(
             p: Union[RunningParticle, List[RunningParticle]], m: Magnet, length: float, footstep: float = 20 * MM,
-            concurrency_level: int = 1,report:bool=True
+            concurrency_level: int = 1, report: bool = True
     ) -> Union[RunningParticle, List[RunningParticle]]:
         """
         让粒子 p 在磁场 m 中运动 length 距离，步长 footstep
@@ -2421,7 +2417,7 @@ class ParticleRunner:
                     [this_p, m, length, footstep] for this_p in p
                 ],
                 concurrency_level=concurrency_level,
-                report = report
+                report=report
             )
             particle_number = len(p)
             for i in range(particle_number):
@@ -3164,10 +3160,10 @@ class CCT(Magnet, ApertureObject):
             # 每匝线圈离散电流元数目，数字越大计算精度越高
             disperse_number_per_winding: int = 120,
     ):
-        if bending_angle<0:
-            print(f"CCT 偏转角度应为正数，不能是 {bending_angle}，需要反向偏转的 CCT，"+
-            "应通过 starting_point_in_ksi_phi_coordinate，和 end_point_in_ksi_phi_coordinate 控制偏转方向"
-            )
+        if bending_angle < 0:
+            print(f"CCT 偏转角度应为正数，不能是 {bending_angle}，需要反向偏转的 CCT，" +
+                  "应通过 starting_point_in_ksi_phi_coordinate，和 end_point_in_ksi_phi_coordinate 控制偏转方向"
+                  )
         self.local_coordinate_system = local_coordinate_system
         self.big_r = float(big_r)
         self.small_r = float(small_r)
@@ -3463,7 +3459,8 @@ class CCT(Magnet, ApertureObject):
         """
         start_point: P2 = trajectory.point_at(s)
         arc_length: float = big_r * BaseUtils.angle_to_radian(bending_angle)
-        end_point: P2 = trajectory.point_at(s + arc_length) # 2021年1月15日 bug fixed
+        end_point: P2 = trajectory.point_at(
+            s + arc_length)  # 2021年1月15日 bug fixed
 
         midpoint0: P2 = trajectory.point_at(s + arc_length / 3 * 1)
         midpoint1: P2 = trajectory.point_at(s + arc_length / 3 * 2)
@@ -3488,13 +3485,13 @@ class CCT(Magnet, ApertureObject):
         lcs = None
         if pos == 0:
             raise ValueError(f"错误：圆心{center}在设计轨道{trajectory}上")
-        elif pos == 1: # center 在 (start_direct, start_point) 右侧，因此逆时针偏转
+        elif pos == 1:  # center 在 (start_direct, start_point) 右侧，因此逆时针偏转
             lcs = LocalCoordinateSystem.create_by_y_and_z_direction(
                 location=center.to_p3(),
                 y_direction=-start_direct.to_p3(),  # diff
                 z_direction=P3.z_direct(),
             )
-        else: # pos = -1  # center 在 (start_direct, start_point) 左侧，因此顺时针偏转
+        else:  # pos = -1  # center 在 (start_direct, start_point) 左侧，因此顺时针偏转
             lcs = LocalCoordinateSystem.create_by_y_and_z_direction(
                 location=center.to_p3(),
                 y_direction=start_direct.to_p3(),  # diff
@@ -3583,7 +3580,7 @@ class CCT(Magnet, ApertureObject):
             length += (p1-p0).length()
         return length*line_number
 
-    def as_cct(anything)->'CCT':
+    def as_cct(anything) -> 'CCT':
         """
         仿佛是类型转换
         实际啥也没做
@@ -3851,7 +3848,7 @@ class Beamline(Line2, Magnet, ApertureObject):
             length: Optional[float] = None,
             footstep: float = 10 * MM,
             concurrency_level: int = 1,
-            report:bool=True
+            report: bool = True
     ) -> Tuple[List[P2], List[P2]]:
         """
         束流跟踪，运行一个相椭圆，返回一个长度 2 的元素，表示相空间 x-xp 平面和 y-yp 平面上粒子投影（单位 mm / mrad）
@@ -4414,7 +4411,7 @@ class BaseUtils:
             return rad * 180.0 / math.pi
         elif isinstance(rad, List):
             return [BaseUtils.radian_to_angle(d) for d in rad]
-        elif isinstance(rad,numpy.ndarray):
+        elif isinstance(rad, numpy.ndarray):
             return numpy.array([BaseUtils.radian_to_angle(d) for d in rad])
         else:
             raise NotImplementedError
@@ -4606,12 +4603,12 @@ class BaseUtils:
         cls.__I_AM_SURE_MY_CODE_CLOSED_IN_IF_NAME_EQUAL_MAIN = True
 
     @classmethod
-    def submit_process_task(cls, 
-        task: Callable[..., T],
-        param_list: List[List], 
-        concurrency_level: Optional[int] = None,
-        report:bool=True
-        ) -> List[T]:
+    def submit_process_task(cls,
+                            task: Callable[..., T],
+                            param_list: List[List],
+                            concurrency_level: Optional[int] = None,
+                            report: bool = True
+                            ) -> List[T]:
         """
         提交任务多进程并行
         task 要运行的任务，是一个函数
@@ -5006,7 +5003,7 @@ class Plot3:
                            axis_lengths[2]], describe=describe)
 
     @staticmethod
-    def set_center(center: P3=P3.origin(), cube_size: float=1.0) -> None:
+    def set_center(center: P3 = P3.origin(), cube_size: float = 1.0) -> None:
         """
         设置视界中心和范围
         因为范围是一个正方体，所以这个方法类似于 Plot2.equal()
@@ -5867,9 +5864,9 @@ if __name__ == "__main__":
     if True:
         BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
 
-        data = [4.378 ,-90.491 ,	87.076,91.829,85.857 ,	
-        101.317,75.725,92.044,9536.310,
-        	-6259.974,25,40,34]
+        data = [4.654,	44.567, 	88.774,
+                98.160,	91.671 	, 101.852,	62.853,
+                91.032,	9412.240,	-7107.416, 25, 40, 34]
 
         gantry = HUST_SC_GANTRY(
             qs3_gradient=data[0],
@@ -5901,10 +5898,10 @@ if __name__ == "__main__":
             GAP3=0.43188,
             qs3_length=0.24379,
 
-            agcct345_inner_small_r=83 * MM + 9.5*MM,
-            agcct345_outer_small_r=98 * MM + 9.5*MM,  # 83+15
-            dicct345_inner_small_r=114 * MM + 9.5*MM,  # 83+30+1
-            dicct345_outer_small_r=130 * MM + 9.5*MM,  # 83+45 +2
+            agcct345_inner_small_r=92.5 * MM,  # 92.5
+            agcct345_outer_small_r=108.5 * MM,  # 83+15
+            dicct345_inner_small_r=124.5 * MM,  # 83+30+1
+            dicct345_outer_small_r=140.5 * MM,  # 83+45 +2
         )
         bl_all = gantry.create_beamline()
 
@@ -5916,7 +5913,8 @@ if __name__ == "__main__":
         bl = gantry.create_second_bending_part(sp, sd)
 
         beamline_phase_ellipse_multi_delta(
-            bl, 8, BaseUtils.linspace(-0.1,0.1,21)#[-0.05, -0.025, 0, +0.025, 0.05]
+            # [-0.05, -0.025, 0, +0.025, 0.05]
+            bl, 8, BaseUtils.linspace(-0.05, 0.05, 5)
         )
 
         plt.show()
