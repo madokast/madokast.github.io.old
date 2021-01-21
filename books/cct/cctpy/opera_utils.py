@@ -329,12 +329,16 @@ class OperaFieldTableMagnet(Magnet):
 
 
 if __name__ == "__main__":
-    if False: # 导出 cond 文件
+    if True: # 导出 cond 文件
         # 2020 年参数
         # data = [-8.085,73.808,80.988,94.383,91.650,106.654,67.901,90.941,9488.615,-7334.914,24,46,37]
 
         # 2021.1.1 参数
-        data = [4.378,-90.491,87.076,91.829,85.857,101.317,75.725,92.044,9536.310,-6259.974,25,40,34]
+        # data = [4.378,-90.491,87.076,91.829,85.857,101.317,75.725,92.044,9536.310,-6259.974,25,40,34]
+
+        data = [4.675 ,	41.126 	,88.773 ,	98.139 ,
+        	91.748 	,101.792 ,	62.677 ,	89.705 ,
+            	9409.261 ,	-7107.359 , 25, 40, 34]
 
         gantry = HUST_SC_GANTRY(
             qs3_gradient=data[0],
@@ -367,10 +371,10 @@ if __name__ == "__main__":
             GAP3=0.43188,
             qs3_length=0.24379,
 
-            agcct345_inner_small_r=83 * MM + 9.5*MM,
-            agcct345_outer_small_r=98 * MM + 9.5*MM,  # 83+15
-            dicct345_inner_small_r=114 * MM + 9.5*MM,  # 83+30+1
-            dicct345_outer_small_r=130 * MM + 9.5*MM,  # 83+45 +2
+            agcct345_inner_small_r=92.5 * MM, 
+            agcct345_outer_small_r=108.5 * MM, 
+            dicct345_inner_small_r=124.5 * MM,
+            dicct345_outer_small_r=140.5 * MM,
         )
 
         bl_all = gantry.create_beamline()
@@ -397,12 +401,12 @@ if __name__ == "__main__":
         b8s_list.extend([Brick8s.create_by_cct(
             c, 3.2*MM, 11*MM, 'agcct', 360) for c in agccts])
 
-        operafile = open("opera0115.cond", "w")
+        operafile = open("opera021.cond", "w")
         operafile.write(OperaConductor.to_opera_cond_script(b8s_list))
         operafile.close()
 
 
-    if True:# opera 对比研究
+    if False:# opera 对比研究
         data = [4.378,-90.491,87.076,91.829,85.857,101.317,75.725,92.044,9536.310,-6259.974,25,40,34]
 
         gantry = HUST_SC_GANTRY(
