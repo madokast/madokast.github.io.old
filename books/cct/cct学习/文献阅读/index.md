@@ -36,3 +36,21 @@ https://escholarship.org/uc/item/0qn9h8jz
 
 时间 2017 作者 L. Brouwer, S. Caspi, R. Hafalia, A. Hodgkinson, S. Prestemon, D. Robin, and W. Wan 机构 LBNL
 
+内容：
+
+1. AGCCT 实现局部消色散，增大动量接受度。
+2. LBNL和PSI都在研究CCT。超导磁铁已经用在加速器中，但是还没有用到机架
+3. COSY首先用于SCOFF设计，后面的CCT绕线设计也是COSY+Biot-Savart完成的（神奇，具体怎么做啊）
+4. 冷却方式、两层CCT的绕线方式（一层后就进入另一层）、超导线布线
+5. 机械支持研究 力学分析 交流损耗 涡流损耗 热研究
+6. 30度样品线圈（无测试结果）
+
+## 02 Design and measurement of a combined function magnet intended for a cancer therapy accelerator
+
+https://www.researchgate.net/publication/32154504_Design_and_measurement_of_a_combined_function_magnet_intended_for_a_cancer_therapy_accelerator
+
+时间 2001 作者 A Morita，Y Iwashita，A Noda，T Shirai，M Tadokoro 机构 日本日立 Hitachi
+
+
+
+

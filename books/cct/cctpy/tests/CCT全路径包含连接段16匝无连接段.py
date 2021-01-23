@@ -1,6 +1,3 @@
-from agcct_connector import *
-from cctpy_ext import *
-from cctpy import *
 import os
 import sys
 curPath = os.path.abspath(os.path.dirname(__file__))
@@ -8,6 +5,10 @@ rootPath = os.path.split(curPath)[0]
 PathProject = os.path.split(rootPath)[0]
 sys.path.append(rootPath)
 sys.path.append(PathProject)
+
+from cctpy import *
+from agcct_connector import *
+from cctpy_ext import *
 
 
 try:
@@ -26,17 +27,16 @@ if __name__ == "__main__":
         .first_drift(P2.y_direct(), BaseUtils.angle_to_radian(20)*R)
         .append_agcct(
             big_r=R,
-            small_rs=[139.5*MM, 123.5*MM, 107.5*MM, 92.5*MM],
-            bending_angles=[-17.05, -27.27, -23.18],  # [15.14, 29.02, 23.34]
-            tilt_angles=[[30, 87.076, 91.829, 85.857],
-                         [101.317, 30, 75.725, 92.044]],
+            small_rs=[140.5*MM, 124.5*MM, 108.5*MM, 92.5*MM],
+            bending_angles=[17.05, 27.27, 23.18],  # [15.14, 29.02, 23.34]
+            tilt_angles=[[30.0, 88.8, 98.1, 91.7],
+                         [101.8, 30.0, 62.7, 89.7]],
             winding_numbers=[[128], [25, 40, 34]],
-            currents=[9536.310, -6259.974],
+            currents=[9409.261, -7107.359],
             disperse_number_per_winding=36
-        ).append_drift(BaseUtils.angle_to_radian(20)*R)
+        )
+        .append_drift(BaseUtils.angle_to_radian(20)*R)
     )
-
-    print([139.5*MM, 123.5*MM, 107.5*MM, 92.5*MM])
 
     depth, width = 11*MM, 3.2*MM
 

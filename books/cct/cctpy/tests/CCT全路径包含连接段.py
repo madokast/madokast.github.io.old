@@ -29,17 +29,16 @@ if __name__ == "__main__":
         .first_drift(P2.y_direct(), BaseUtils.angle_to_radian(20)*R)
         .append_agcct(
             big_r=R,
-            small_rs=[139.5*MM, 123.5*MM, 107.5*MM, 92.5*MM],
-            bending_angles=[-17.05, -27.27, -23.18],  # [15.14, 29.02, 23.34]
-            tilt_angles=[[30, 87.076, 91.829, 85.857],
-                         [101.317, 30, 75.725, 92.044]],
+            small_rs=[140.5*MM, 124.5*MM, 108.5*MM, 92.5*MM],
+            bending_angles=[17.05, 27.27, 23.18],  # [15.14, 29.02, 23.34]
+            tilt_angles=[[30.0, 88.8, 98.1, 91.7],
+                         [101.8, 30.0, 62.7, 89.7]],
             winding_numbers=[[128], [25, 40, 34]],
-            currents=[9536.310, -6259.974],
+            currents=[9409.261, -7107.359],
             disperse_number_per_winding=36
         ).append_drift(BaseUtils.angle_to_radian(20)*R)
     )
 
-    print([139.5*MM, 123.5*MM, 107.5*MM, 92.5*MM])
 
     depth, width = 11*MM, 3.2*MM
 
@@ -81,10 +80,10 @@ if __name__ == "__main__":
         path4 = lambda ksi:p3_func(ksi) + 0.5*depth*main_normal_direct(ksi) - 0.5*width*second_normal_direction(ksi)
 
         numpy.savetxt('dicct_in_center.txt',1000*numpy.array([P3.as_p3(path0(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
-        numpy.savetxt('dicct_in_1.txt',1000*numpy.array([P3.as_p3(path1(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
-        numpy.savetxt('dicct_in_2.txt',1000*numpy.array([P3.as_p3(path2(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
-        numpy.savetxt('dicct_in_3.txt',1000*numpy.array([P3.as_p3(path3(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
-        numpy.savetxt('dicct_in_4.txt',1000*numpy.array([P3.as_p3(path4(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
+        # numpy.savetxt('dicct_in_1.txt',1000*numpy.array([P3.as_p3(path1(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
+        # numpy.savetxt('dicct_in_2.txt',1000*numpy.array([P3.as_p3(path2(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
+        # numpy.savetxt('dicct_in_3.txt',1000*numpy.array([P3.as_p3(path3(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
+        # numpy.savetxt('dicct_in_4.txt',1000*numpy.array([P3.as_p3(path4(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
         print('down')
 
         # Plot3.plot_p3s([p3_func(t) for t in BaseUtils.linspace(ksi0,ksi1,10000)],describe='r-')
@@ -118,10 +117,10 @@ if __name__ == "__main__":
 
         
         numpy.savetxt('dicct_out_center.txt',1000*numpy.array([P3.as_p3(path0(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
-        numpy.savetxt('dicct_out_1.txt',1000*numpy.array([P3.as_p3(path1(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
-        numpy.savetxt('dicct_out_2.txt',1000*numpy.array([P3.as_p3(path2(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
-        numpy.savetxt('dicct_out_3.txt',1000*numpy.array([P3.as_p3(path3(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
-        numpy.savetxt('dicct_out_4.txt',1000*numpy.array([P3.as_p3(path4(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
+        # numpy.savetxt('dicct_out_1.txt',1000*numpy.array([P3.as_p3(path1(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
+        # numpy.savetxt('dicct_out_2.txt',1000*numpy.array([P3.as_p3(path2(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
+        # numpy.savetxt('dicct_out_3.txt',1000*numpy.array([P3.as_p3(path3(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
+        # numpy.savetxt('dicct_out_4.txt',1000*numpy.array([P3.as_p3(path4(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
         print('down')
 
         # Plot3.plot_p3s([p3_func(t) for t in BaseUtils.linspace(ksi0,ksi1,10000)],describe='r-')
@@ -182,10 +181,10 @@ if __name__ == "__main__":
 
         
         numpy.savetxt('agcct_in_center.txt',1000*numpy.array([P3.as_p3(path0(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
-        numpy.savetxt('agcct_in_1.txt',1000*numpy.array([P3.as_p3(path1(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
-        numpy.savetxt('agcct_in_2.txt',1000*numpy.array([P3.as_p3(path2(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
-        numpy.savetxt('agcct_in_3.txt',1000*numpy.array([P3.as_p3(path3(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
-        numpy.savetxt('agcct_in_4.txt',1000*numpy.array([P3.as_p3(path4(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
+        # numpy.savetxt('agcct_in_1.txt',1000*numpy.array([P3.as_p3(path1(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
+        # numpy.savetxt('agcct_in_2.txt',1000*numpy.array([P3.as_p3(path2(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
+        # numpy.savetxt('agcct_in_3.txt',1000*numpy.array([P3.as_p3(path3(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
+        # numpy.savetxt('agcct_in_4.txt',1000*numpy.array([P3.as_p3(path4(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
         print('down')
 
         # Plot3.plot_p3s([p3_func(t) for t in BaseUtils.linspace(ksi0,ksi1,128*360)],describe='r-')
@@ -246,10 +245,10 @@ if __name__ == "__main__":
 
         
         numpy.savetxt('agcct_out_center.txt',1000*numpy.array([P3.as_p3(path0(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
-        numpy.savetxt('agcct_out_1.txt',1000*numpy.array([P3.as_p3(path1(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
-        numpy.savetxt('agcct_out_2.txt',1000*numpy.array([P3.as_p3(path2(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
-        numpy.savetxt('agcct_out_3.txt',1000*numpy.array([P3.as_p3(path3(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
-        numpy.savetxt('agcct_out_4.txt',1000*numpy.array([P3.as_p3(path4(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
+        # numpy.savetxt('agcct_out_1.txt',1000*numpy.array([P3.as_p3(path1(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
+        # numpy.savetxt('agcct_out_2.txt',1000*numpy.array([P3.as_p3(path2(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
+        # numpy.savetxt('agcct_out_3.txt',1000*numpy.array([P3.as_p3(path3(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
+        # numpy.savetxt('agcct_out_4.txt',1000*numpy.array([P3.as_p3(path4(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
         print('down')
 
         # Plot3.plot_p3s([p3_func(t) for t in BaseUtils.linspace(ksi0,ksi1,128*3600)],describe='r-')

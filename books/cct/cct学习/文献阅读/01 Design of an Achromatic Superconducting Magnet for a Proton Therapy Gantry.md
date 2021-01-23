@@ -16,7 +16,7 @@ Index Terms—Accelerator magnets, superconducting gantry magnets, proton therap
 
 ### I. INTRODUCTION
 
-**介绍AGCC，动量接受度20%，LBNL和PSI都在研究CCT，超导磁铁已经用在加速器中，但是还没有用到机架。**
+**介绍AGCCT，动量接受度20%，LBNL和PSI都在研究CCT，超导磁铁已经用在加速器中，但是还没有用到机架。**
 
 SUPERCONDUCTING magnets are desirable for particle therapy gantries due to their low weight and ability to produce the complex, combined function fields required for achromatic beam optics. Recently, a new superconducting magnet concept called the Alternating Gradient Canted-Cosine-Theta (AG-CCT) was developed to make use of these advantages. A first design study implementing the AG-CCT concept was completed, achieving twenty-five percent momentum acceptance in a compact gantry for proton therapy [1]. Lawrence Berkeley National Laboratory (LBNL) in collaboration with the Paul Scherrer Institute (PSI) and Varian Medical Systems is now developing a superconducting magnet for a similar system. This project is part of the newly established US Office of High Energy Physics Accelerator Stewardship Program and is aligned with the R&D needs for future state-of-the-art ion beam therapy facilities as concluded by a joint DOE and NIH workshop [2].
 

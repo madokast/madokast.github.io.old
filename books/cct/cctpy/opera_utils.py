@@ -397,9 +397,9 @@ if __name__ == "__main__":
         # Plot2.show()
 
         b8s_list = [Brick8s.create_by_cct(
-            c, 3.2*MM, 11*MM, 'dicct', 360) for c in diccts]
+            c, 3.2*MM, 11*MM, 'dicct', 10) for c in diccts]
         b8s_list.extend([Brick8s.create_by_cct(
-            c, 3.2*MM, 11*MM, 'agcct', 360) for c in agccts])
+            c, 3.2*MM, 11*MM, 'agcct', 10) for c in agccts])
 
         operafile = open("opera021.cond", "w")
         operafile.write(OperaConductor.to_opera_cond_script(b8s_list))
