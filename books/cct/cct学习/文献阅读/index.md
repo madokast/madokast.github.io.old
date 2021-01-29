@@ -51,6 +51,17 @@ https://www.researchgate.net/publication/32154504_Design_and_measurement_of_a_co
 
 时间 2001 作者 A Morita，Y Iwashita，A Noda，T Shirai，M Tadokoro 机构 日本日立 Hitachi
 
+## 62 Magnetic Design of a Superconducting Toroidal Gantry for Hadron Therapy
+
+## 63 GaToroid: a Novel Toroidal Gantry for Hadron Therapy
+
+CERN 2020 圆环机架
+
+
+## 65 High order beam optics optimization for a superconducting gantry applied to proton therapy based on NSGA-III
+
+廖益诚 小论文 遗传优化 2021
+
 
 
 

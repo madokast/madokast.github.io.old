@@ -5864,9 +5864,9 @@ if __name__ == "__main__":
     if True:
         BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
 
-        data = [4.675 ,	41.126 	,88.773 ,	98.139 ,
-        	91.748 	,101.792 ,	62.677 ,	89.705 ,
-            	9409.261 ,	-7107.359 , 25, 40, 34]
+        data = [4.675,	41.126 	, 88.773,	98.139,
+                91.748 	, 101.792,	62.677,	89.705,
+                9409.261,	-7107.359, 25, 40, 34]  # *99.8/100
 
         gantry = HUST_SC_GANTRY(
             qs3_gradient=data[0],
@@ -5914,8 +5914,8 @@ if __name__ == "__main__":
 
         beamline_phase_ellipse_multi_delta(
             # [-0.05, -0.025, 0, +0.025, 0.05]
-            bl, 8, BaseUtils.linspace(-0.08, 0.07, 9),
-            describles = ['r-', 'y-', 'b-', 'k-', 'g-', 'c-', 'm-','r--', 'y--']
+            bl, 8, [-0.05, -0.025, 0, +0.025, 0.05],
+            describles=['r-', 'y-', 'b-', 'k-', 'g-', 'c-', 'm-', 'r--', 'y--']
         )
 
         plt.show()
