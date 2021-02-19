@@ -1,15 +1,16 @@
 """
 COSY Infinity 相关工具类
 
+CosyMap 用于读取 COSY 任意阶 MAP，并进行粒子跟踪
+
+2021年2月8日 新增 SRConvertor 将相空间粒子 PhaseSpaceParticle 转为 COSY 脚本 SR < x > < xp > < y > < yp > <T> <dp> <G> <Z> <color> ;
+
 @Author 赵润晓
 """
 
 from typing import List
 from cctpy import *
 
-"""
-读取 COSY 任意阶矩阵
-"""
 
 
 class CosyMap:
@@ -28,10 +29,11 @@ class CosyMap:
         self.map = map
         self.contributionLinesString = map.split('\n')
 
-    def apply(self, p0: PhaseSpaceParticle, order: int = 1) -> PhaseSpaceParticle:
+    def apply(self, p0: PhaseSpaceParticle, order: int = 1, print_detail:bool=False) -> PhaseSpaceParticle:
         """
         map 作用于相空间粒子 p0，返回作用后的结果
         order 表示需要考虑的阶数，注意应不大于构造 CosyMap 时传入的阶数
+        print_detail 表示打印每个矩阵项的详细贡献，默认不打印
         """
         x = 0.0
         xp = 0.0
@@ -68,6 +70,9 @@ class CosyMap:
 
             ypContribution = float(yp_contribution_string)
             yp += ypContribution * contributionBy
+
+            if print_detail:
+                print(f"{contribution_describing} {xContribution* contributionBy} {xpContribution* contributionBy} {yContribution* contributionBy} {ypContribution* contributionBy}")
 
         return PhaseSpaceParticle(x, xp, y, yp, p0.z, p0.delta)
 
@@ -153,6 +158,33 @@ class CosyMap:
 
         return p1.x - p0.x
 
+
+class SRConvertor:
+    COLOR_BLACK=1
+    COLOR_BLUE=2
+    COLOR_RED=3
+    COLOR_YELLOW=4
+    COLOR_GREEN=5
+    COLOR_WHITE=10
+
+    @classmethod
+    def to_cosy_sr(cls,phase_space_particle: Union[PhaseSpaceParticle,List[PhaseSpaceParticle]], color: int=COLOR_BLUE) -> Union[str,List[str]]:
+        """
+        将相空间粒子 PhaseSpaceParticle 转为 COSY 脚本 SR < x > < xp > < y > < yp > <T> <dp> <G> <Z> <color> ;
+
+        color 表示 
+        """
+        if isinstance(phase_space_particle,PhaseSpaceParticle):
+            return (
+                f"SR {phase_space_particle.x} {phase_space_particle.xp} "
+                +f"{phase_space_particle.y} {phase_space_particle.yp} 0 "
+                +f"{phase_space_particle.delta} 0 0 {color} ;"
+            )
+        elif isinstance(phase_space_particle,List):
+            return '\n'.join([cls.to_cosy_sr(p) for p in phase_space_particle])
+
+
+    
 
 if __name__ == "__main__":
     MAP_LIAOYICHENG_ALL_GANTRY = CosyMap("""  0.9204298      2.342948     0.0000000E+00 0.0000000E+00 0.2875828E-01 100000
@@ -705,16 +737,19 @@ if __name__ == "__main__":
         ps, order=5) for ps in pps]
 
     # 转回动能分散
-    pps_end = [ PhaseSpaceParticle.convert_delta_from_energy_dispersion_to_momentum_dispersion_for_list(
+    pps_end = [PhaseSpaceParticle.convert_delta_from_energy_dispersion_to_momentum_dispersion_for_list(
         ps, centerKineticEnergy_MeV=250) for ps in pps_end]
 
-    Plot2.plot(PhaseSpaceParticle.phase_space_particles_project_to_plane(pps_end[0], plane,convert_to_mm=True), describe='r.')
-    Plot2.plot(PhaseSpaceParticle.phase_space_particles_project_to_plane(pps_end[1], plane,convert_to_mm=True), describe='k.')
-    Plot2.plot(PhaseSpaceParticle.phase_space_particles_project_to_plane(pps_end[2], plane,convert_to_mm=True), describe='b.')
+    Plot2.plot(PhaseSpaceParticle.phase_space_particles_project_to_plane(
+        pps_end[0], plane, convert_to_mm=True), describe='r.')
+    Plot2.plot(PhaseSpaceParticle.phase_space_particles_project_to_plane(
+        pps_end[1], plane, convert_to_mm=True), describe='k.')
+    Plot2.plot(PhaseSpaceParticle.phase_space_particles_project_to_plane(
+        pps_end[2], plane, convert_to_mm=True), describe='b.')
 
-    Plot2.info(x_label='mm',y_label='mr',title="x-plane",font_size=18)
+    Plot2.info(x_label='mm', y_label='mr', title="x-plane", font_size=18)
 
-    Plot2.legend('dp-5','dp0','dp5')
+    Plot2.legend('dp-5', 'dp0', 'dp5')
 
     Plot2.equal()
 

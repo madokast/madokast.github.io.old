@@ -12,19 +12,22 @@ v0.1.3      2021年1月4日 添加拉格朗日 4 点插值函数 BaseUtils.inter
             2021年1月7日 新增查看点 viewed_point 是不是在右边 StraightLine2.is_on_right
             2021年1月7日 给 Line2.direct_at 添加粗略实现
             2021年1月9日 无依赖拷贝坐标系 LocalCoordinateSystem.copy()，类型转换 CCT.as_cct()  P3.as_p3()
+v0.1.4      2021年2月7日 BaseUtils.Random 类，用于生成一些随机分布。
+            2021年2月8日 ParticleFactory.distributed_particles() 方法，用于生成各种随机分布的粒子
 
 @Author 赵润晓
 """
 
 import multiprocessing  # since v0.1.1 多线程计算
 import time  # since v0.1.1 统计计算时长
-from typing import Callable, Generic, Iterable, List, NoReturn, Optional, Tuple, TypeVar, Union
+from typing import Callable, Dict, Generic, Iterable, List, NoReturn, Optional, Tuple, TypeVar, Union
 import matplotlib.pyplot as plt
 import math
 import random  # since v0.1.1 随机数
 import sys
 import os  # since v0.1.1 查看CPU核心数
 import numpy
+from numpy.core.fromnumeric import var
 from scipy.integrate import solve_ivp  # since v0.1.1 ODE45
 import warnings  # since v0.1.1 提醒方法过时
 
@@ -3131,6 +3134,152 @@ class ParticleFactory:
             for p in phase_space_particles
         ]
 
+    DISTRIBUTION_AREA_EDGE = 1
+    DISTRIBUTION_AREA_FULL = 2
+
+    @classmethod
+    def distributed_particles(cls, x: float, xp: float, y: float, yp: float, delta: float, number: int,
+                              distribution_area: int,
+                              x_distributed: bool = False, xp_distributed: bool = False,
+                              y_distributed: bool = False, yp_distributed: bool = False,
+                              delta_distributed: bool = False,
+                              distribution_type="uniform") -> List[PhaseSpaceParticle]:
+        """
+        随机产生某种分布的粒子集合
+
+        仅支持正相椭圆/球分布，即不支持有倾斜角的相椭圆
+
+        相椭圆参数由 5 个轴给出，即 x xp y yp delta，例如 3.5mm 7.5mr 3.5mm 7.5mr 0.08
+
+        number 指定生成的粒子数目
+
+        distribution_area 指定粒子的分布区域，有边缘分布 DISTRIBUTION_AREA_EDGE 和全分布 DISTRIBUTION_AREA_FULL 两种
+            边缘分布指的是，粒子位于相椭圆的圆周 或者 位于相椭球的表面
+              全分布指的是，粒子位于相椭圆的内部 或者 位于相椭球的内部
+
+        *_distributed 是一个布尔量，指定变量是否参于分布。默认不参与
+            例如 x=xp=1，x_distributed=true，xp_distributed=false时，表示 x 参与分布，xp 不参与，
+            即生成的粒子类似 (x=0.13,xp=1), (x=-0.79,xp=1), (x=0.45,xp=1)...
+            再例如 x=xp=y=yp=delta=1，且 y_distributed，yp_distributed，delta_distributed 三个设为 true,
+            则生成的粒子类似 (x=1,xp=1,y=0.3,yp=-0.5,delta=0.1) ...
+
+            不参与分布的变量，输出即原值
+
+        distribution_type 表示分布类型，当前仅支持均匀分布 uniform
+
+        ----------------------
+        使用示例
+        束流参数为 x=y=3.5mm，xp,yp=7.5mr，dp=8%。生成粒子数目20
+
+        1. 生成x/xp相椭圆圆周上，动量分散为0的粒子，
+            ps = ParticleFactory.distributed_particles(
+                3.5*MM, 7.5*MRAD, 3.5*MM, 7.5*MRAD, 0.0, 20,
+                ParticleFactory.DISTRIBUTION_AREA_EDGE,
+                x_distributed=True, xp_distributed=True
+            )
+        2. 生成y/yp相椭圆内部，动量分散均为0.05的粒子
+            ps = ParticleFactory.distributed_particles(
+                3.5*MM, 7.5*MRAD, 3.5*MM, 7.5*MRAD, 0.0, 20,
+                ParticleFactory.DISTRIBUTION_AREA_FULL,
+                y_distributed=True, yp_distributed=True
+            )
+        3. 生成 x/xp/delta 三维相椭球球面的粒子
+            ps = ParticleFactory.distributed_particles(
+                3.5*MM, 7.5*MRAD, 3.5*MM, 7.5*MRAD, 0.08, 20,
+                ParticleFactory.DISTRIBUTION_AREA_EDGE,
+                x_distributed=True, xp_distributed=True, delta_distributed=True
+            )
+            
+        since v0.1.4
+        """
+        params = [x, xp, y, yp, delta]  # 全部参数
+        distributed = [x_distributed, xp_distributed, y_distributed,
+                       yp_distributed, delta_distributed]  # 是否参与分布
+        variables = [params[i]
+                     for i in range(len(params)) if distributed[i]]  # 参与分布的变量
+        dim = len(variables)  # 分布维度
+
+        if dim == 0:
+            print("没有变量参与分布")
+            return [PhaseSpaceParticle(x, xp, y, yp, 0, delta) for ignore in range(number)]
+
+        distribution: List[List[float]] = None
+
+        if distribution_type == "uniform":
+            if distribution_area == cls.DISTRIBUTION_AREA_EDGE:
+                # 边缘分布
+                if dim == 1:
+                    raise ValueError("一维下无边缘分布")
+                elif dim == 2:
+                    # 椭圆圆周
+                    distribution = [
+                        BaseUtils.Random.uniformly_distributed_along_elliptic_circumference(
+                            variables[0], variables[1]).to_list()
+                        for ignore in range(number)
+                    ]
+                elif dim == 3:
+                    # 椭球表面
+                    distribution = [
+                        BaseUtils.Random.uniformly_distributed_at_ellipsoidal_surface(
+                            variables[0], variables[1], variables[2]).to_list()
+                        for ignore in range(number)
+                    ]
+                else:
+                    # 超椭球表面
+                    distribution = [
+                        BaseUtils.Random.uniformly_distributed_at_hypereellipsoidal_surface(
+                            variables)
+                        for ignore in range(number)
+                    ]
+            elif distribution_area == cls.DISTRIBUTION_AREA_FULL:
+                if dim == 1:
+                    # 一维均匀分布
+                    distribution = [
+                        [random.uniform(-variables[0], variables[0])] for ignore in range(number)]
+                elif dim == 2:
+                    # 椭圆内分布
+                    distribution = [
+                        BaseUtils.Random.uniformly_distributed_in_ellipse(
+                            variables[0], variables[1]).to_list()
+                        for ignore in range(number)
+                    ]
+                elif dim == 3:
+                    # 椭球内分布
+                    distribution = [
+                        BaseUtils.Random.uniformly_distributed_in_ellipsoid(
+                            variables[0], variables[1], variables[2]).to_list()
+                        for ignore in range(number)
+                    ]
+                else:
+                    # 超椭球内分布
+                    distribution = [
+                        BaseUtils.Random.uniformly_distributed_in_hypereellipsoid(
+                            variables)
+                        for ignore in range(number)
+                    ]
+            else:
+                raise ValueError("分布区域仅支持边缘分布和全分布")
+        else:
+            raise ValueError("当前仅支持均匀分布")
+
+        # distribution
+        ps: List[PhaseSpaceParticle] = []
+        for i in range(number):
+            cur_params: List[float] = []
+            distribution_index:int = 0
+            for j in range(len(params)):
+                if distributed[j]:
+                    # 变量
+                    cur_params.append(distribution[i][distribution_index])
+                    distribution_index = distribution_index+1
+                else:
+                    # 常量
+                    cur_params.append(params[j])
+            ps.append(PhaseSpaceParticle(
+                cur_params[0], cur_params[1], cur_params[2], cur_params[3], 0.0, cur_params[4]))
+
+        return ps
+
 
 class CCT(Magnet, ApertureObject):
     """
@@ -3585,6 +3734,9 @@ class CCT(Magnet, ApertureObject):
         仿佛是类型转换
         实际啥也没做
         但是 IDE 就能根据返回值做代码提示了
+
+        常用在将 Magnet 转成 CCT
+        例如从 Beamline 中取出的 magnets，然后按照真是类型转过去
 
         since v0.1.3
         """
@@ -4653,6 +4805,28 @@ class BaseUtils:
             self.C = float(C)
             self.D = float(D)
 
+        def __eq__(self, other: 'BaseUtils.Ellipse') -> bool:
+            """
+            椭圆相等判断
+            注意：因为 A B C D 具有放大不变性，所以判断为不等的椭圆，有可能是相等的
+
+            since v0.1.4
+            """
+            return (
+                self.A == other.A and
+                self.B == other.B and
+                self.C == other.C and
+                self.D == other.D
+            )
+
+        def __hash__(self) -> int:
+            """
+            hash 方法，因为需要将椭圆当作字典的键
+
+            since v0.1.4
+            """
+            return hash((self.A, self.B, self.C, self.D))
+
         def point_at(self, theta: float) -> P2:
             """
             原点出发，方向th弧度的射线和椭圆Ax^2+Bxy+Cy^2=D的交点
@@ -4697,21 +4871,31 @@ class BaseUtils:
 
             return d
 
+        # circumference 方法缓存
+        CIRCUMFERENCE_CACHE: Dict['BaseUtils.Ellipse', float] = dict()
+
         @property
         def circumference(self) -> float:
             """
             计算椭圆周长
             Returns 计算椭圆周长
+
+            refactor v0.1.4 添加缓存
             -------
 
             """
-            num: int = 3600 * 4
-            c: float = 0.0
-            for i in range(num):
-                c += (
-                    self.point_at(2.0 * math.pi / float(num) * (i + 1))
-                    - self.point_at(2.0 * math.pi / float(num) * (i))
-                ).length()
+            c: float = BaseUtils.Ellipse.CIRCUMFERENCE_CACHE.get(self)
+
+            if c is None:
+                num: int = 3600 * 4
+                c: float = 0.0
+                for i in range(num):
+                    c += (
+                        self.point_at(2.0 * math.pi / float(num) * (i + 1))
+                        - self.point_at(2.0 * math.pi / float(num) * (i))
+                    ).length()
+
+                BaseUtils.Ellipse.CIRCUMFERENCE_CACHE[self] = c
 
             return c
 
@@ -4812,6 +4996,312 @@ class BaseUtils:
             """
             self.__data: List[float] = []
             return self
+
+    class Random:
+        """
+        产生随机分布的类
+        包括以下分布
+            uniformly_distributed_along_circumference          单位圆的圆周均匀分布
+            uniformly_distributed_in_circle                    单位圆内均匀分布
+            uniformly_distributed_at_spherical_surface         单位球面均匀分布
+            uniformly_distributed_in_sphere                    单位球内均匀分布
+            uniformly_distributed_along_elliptic_circumference 椭圆的圆周均匀分布
+            uniformly_distributed_in_ellipse                   椭圆内均匀分布
+            uniformly_distributed_at_ellipsoidal_surface       椭球球面均匀分布
+            uniformly_distributed_in_ellipsoid                 椭球球内均匀分布
+            uniformly_distributed_at_hyperespherical_surface   超球体表面均匀分布
+            uniformly_distributed_in_hyperesphere              超球体内均匀分布
+            uniformly_distributed_at_hypereellipsoidal_surface 超椭球体表面均匀分布
+            uniformly_distributed_in_hypereellipsoid           超椭球体内均匀分布
+
+        辅助函数
+            hypersphere_volume                                 超球体体积
+            hypersphere_area                                   超球体面积
+
+
+
+        since v0.1.4
+        """
+        @classmethod
+        def uniformly_distributed_along_circumference(cls) -> P2:
+            """
+            单位圆的圆周均匀分布点
+            原理：生成 [0, 2π) 的均与分布点，就是圆的方位角 azimuth，再转为二维点
+            """
+            azimuth = 2.0 * math.pi * random.random()  # [0, 2π)
+            return P2(math.cos(azimuth), math.sin(azimuth))
+
+        @staticmethod
+        def uniformly_distributed_in_circle() -> P2:
+            """
+            单位圆内均匀分布
+            原理：生成两个 [-1, 1] 分布的点 x y，
+                若 (x,y) 在圆内则返回，否则重试
+            """
+            while True:
+                x = random.uniform(-1, 1)
+                y = random.uniform(-1, 1)
+                if x**2+y**2 <= 1:
+                    return P2(x, y)
+
+        @staticmethod
+        def uniformly_distributed_at_spherical_surface() -> P3:
+            """
+            单位球面均匀分布
+            原理：天顶角 zenith / θ 的取值范围为 [0, π]，
+                当具体取值为 θ0 时，对应的圆半径为 sin(θ0)，则周长为 2πsin(θ0)
+                因此生成两个随机数 θ/天顶角 和周长位置 a
+                θ 的取值范围为 [0, π]
+                a 的取值范围为 [0, 2π]
+                若 a < 2πsin(θ0)，则 (θ, a) 是圆面上的点，输出
+            """
+            while True:
+                zenith = random.uniform(0, math.pi)  # 天顶角
+                a = random.uniform(0, 2*math.pi)
+                if a < 2.0*math.pi*math.sin(zenith):
+                    azimuth = a / math.sin(zenith)  # 方位角
+                    return P3(
+                        x=math.sin(zenith)*math.cos(azimuth),
+                        y=math.sin(zenith)*math.sin(azimuth),
+                        z=math.cos(zenith)
+                    )
+
+        @staticmethod
+        def uniformly_distributed_in_sphere() -> P3:
+            """
+            单位球内均匀分布
+            原理：产生三个随机数 x y z，为 [-1,1] 上均匀分布
+                若这三个数对应的点在单位球内部，则输出
+            """
+            while True:
+                x = random.uniform(-1, 1)
+                y = random.uniform(-1, 1)
+                z = random.uniform(-1, 1)
+                if x**2+y**2+z**2 <= 1:
+                    return P3(x, y, z)
+
+        @staticmethod
+        def uniformly_distributed_along_elliptic_circumference(a: float, b: float) -> P2:
+            """
+            椭圆的圆周均匀分布点
+            原理：求椭圆周长 c0，生成 [0, c) 的均与分布点 c，求得方位角度 azimuth，再转为二维点
+
+            椭圆必须是正椭圆
+            a 为 x 轴方向轴长度
+            b 为 y 轴方向轴长度
+            """
+            e = BaseUtils.Ellipse(A=1/(a**2), C=1/(b**2), B=0.0, D=1.0)
+            c0 = e.circumference  # 椭圆周长
+
+            c = random.uniform(0, c0)
+
+            return e.point_after(c)
+
+        @staticmethod
+        def uniformly_distributed_in_ellipse(a: float, b: float) -> P2:
+            """
+            椭圆内均匀分布
+            原理：生成两个 [-a, a] 和 [-b, b] 分布的点 x y，
+                若 (x,y) 在椭圆内则返回，否则重试
+
+            椭圆必须是正椭圆
+            a 为 x 轴方向轴长度
+            b 为 y 轴方向轴长度
+            """
+            while True:
+                x = random.uniform(-a, a)
+                y = random.uniform(-b, b)
+                if (x**2)/(a**2)+(y**2)/(b**2) <= 1:
+                    return P2(x, y)
+
+        @staticmethod
+        def uniformly_distributed_at_ellipsoidal_surface(a: float, b: float, c: float) -> P3:
+            """
+            椭球球面均匀分布
+            原理：天顶角 zenith / θ 的取值范围为 [0, π]，
+                当具体取值为 θ0 时，对应的椭圆周长可以计算，设为 c0，最大值为 c_max
+                因此生成两个随机数 θ/天顶角 和周长位置 a
+                θ 的取值范围为 [0, π]
+                a 的取值范围为 [0, c_max]
+                若 a < c0，则 (θ, a) 是椭圆面上的点，输出
+
+            椭球必须是正椭球
+            a 为 x 轴方向轴长度
+            b 为 y 轴方向轴长度
+            c 为 z 轴方向轴长度
+            """
+            # 椭球在 z=0 平面，即 xy 平面上的 椭圆
+            e_xy = BaseUtils.Ellipse(A=1/(a**2), C=1/(b**2), B=0.0, D=1.0)
+
+            # 椭球在 zy 平面上的椭圆，且横坐标为 z，纵坐标为 y
+            e_zy = BaseUtils.Ellipse(A=1/(c**2), C=1/(b**2), B=0.0, D=1.0)
+
+            # 椭球在 zx 平面上的椭圆，且横坐标为 z，纵坐标为 x
+            e_zx = BaseUtils.Ellipse(A=1/(c**2), C=1/(a**2), B=0.0, D=1.0)
+
+            # e_xy 椭圆的周长
+            c_max = e_xy.circumference
+
+            while True:
+                # 天顶角 / 高度角
+                zenith = random.uniform(0, math.pi)  # 天顶角
+
+                # 可能的周长
+                a = random.uniform(0, c_max)
+
+                # 由 天顶角 和椭球交点产生的小椭圆 e_cur
+                a_cur = e_zx.point_at(zenith).y  # ax
+                b_cur = e_zy.point_at(zenith).y  # by
+
+                # 小椭圆 e_cur
+                e_cur = BaseUtils.Ellipse(
+                    A=1/(a_cur**2), C=1/(b_cur**2), B=0.0, D=1.0)
+                # 小椭圆周长
+                c0_cur = e_cur.circumference
+
+                # 如果 a 小于小椭圆周长，则 (zenith,a) 在椭球面上
+                if a <= c0_cur:
+                    # x y 坐标
+                    p_xy = e_cur.point_after(a)
+                    # z 坐标
+                    pz = e_zx.point_at(zenith).x
+                    return P3(p_xy.x, p_xy.y, pz)
+
+        @staticmethod
+        def uniformly_distributed_in_ellipsoid(a: float, b: float, c: float) -> P3:
+            """
+            椭球球内均匀分布
+            原理：产生三个随机数 x y z，为 [-a,a] [-b,b] [-c,c]上均匀分布
+                若这三个数对应的点在单位球内部，则输出
+
+            椭球必须是正椭球
+            a 为 x 轴方向轴长度
+            b 为 y 轴方向轴长度
+            c 为 z 轴方向轴长度
+
+            since
+            """
+            while True:
+                x = random.uniform(-a, a)
+                y = random.uniform(-b, b)
+                z = random.uniform(-c, c)
+                if (x**2)/(a**2)+(y**2)/(b**2)+(z**2)/(c**2) <= 1:
+                    return P3(x, y, z)
+
+        @classmethod
+        def hypersphere_volume(cls, d: int, r: float = 1.0) -> float:
+            """
+            超球体的体积
+            https://baike.baidu.com/item/%E8%B6%85%E7%90%83%E9%9D%A2/4907511?fr=aladdin#2
+
+            d 维度
+            r 超球体半径
+            """
+            if isinstance(d, int):
+                if d % 2 == 1:
+                    # 维度为奇数
+                    k = (d-1)//2
+                    c = (2**d)*(math.factorial(k)) * \
+                        (math.pi**k)/(math.factorial(d))
+                    return c*(r**d)
+                else:
+                    # 维度为偶数
+                    k = d//2
+                    c = (math.pi**k)/(math.factorial(k))
+                    return c*(r**d)
+            else:
+                raise ValueError(f"维度{d}必须是整数")
+
+        @classmethod
+        def hypersphere_area(cls, d: int, r: float = 1.0) -> float:
+            """
+            超球体的表面积
+            https://baike.baidu.com/item/%E8%B6%85%E7%90%83%E9%9D%A2/4907511?fr=aladdin#2
+
+            d 维度
+            r 超球体半径
+            """
+            if isinstance(d, int):
+                return cls.hypersphere_volume(d, r)*d/r
+            else:
+                raise ValueError(f"维度{d}必须是整数")
+
+        @classmethod
+        def uniformly_distributed_at_hyperespherical_surface(cls, d: int, r: float = 1.0) -> List[float]:
+            """
+            超球体面均匀分布
+            递归计算
+
+            d 维度
+            r 超球体半径
+
+            注意 2 维球体表面分布，指的是圆周分布
+            """
+            if isinstance(d, int):
+                if d == 1:
+                    # 一维直线
+                    raise ValueError("一维球无表面")
+                elif d == 2:
+                    # 二维圆
+                    p = cls.uniformly_distributed_along_circumference().change_length(r)
+                    return [p.x, p.y]
+                else:
+                    # 高维
+                    while True:
+                        # 第一个维度分布
+                        fisrt_dim = random.uniform(-r, r)
+                        # 剩余维度，是一个 d-1 维的超球体，表面积最大为
+                        area_max = cls.hypersphere_area(d-1, r)
+                        # 表面积均匀分布
+                        area_pick = random.uniform(-area_max, area_max)
+
+                        # 实际上 fisrt_dim 确定后，d-1 维球体的半径为
+                        r_sub = math.sqrt(r**2-fisrt_dim**2)  # bug fixed
+                        # 这样实际的表面积是
+                        area_real = cls.hypersphere_area(d-1, r_sub)
+                        if area_pick <= area_real:
+                            return [fisrt_dim] + cls.uniformly_distributed_at_hyperespherical_surface(d-1, r_sub)
+            else:
+                raise ValueError(f"维度{d}必须是整数")
+
+        @classmethod
+        def uniformly_distributed_at_hypereellipsoidal_surface(cls, axes: List[float]) -> List[float]:
+            """
+            超椭球球面均匀分布
+            axes 为各个轴的半轴长，例如[3.5, 7.5, 3.5, 7.5, 0.08]
+            !!! 注意：因为超椭球的表面积很难计算（椭圆积分），所以先当作超球体处理，然后各轴拉伸为超椭球
+                这样的分布，不再是标准的均匀分布
+            """
+            dim = len(axes)
+            p = cls.uniformly_distributed_at_hyperespherical_surface(dim)
+            for i in range(dim):
+                p[i] *= axes[i]
+            return p
+
+        @classmethod
+        def uniformly_distributed_in_hypereellipsoid(cls, axes: List[float]) -> List[float]:
+            """
+            超椭球球内均匀分布
+            axes 为各个轴的半轴长，例如[3.5, 7.5, 3.5, 7.5, 0.08]
+            """
+            dim = len(axes)
+            while True:
+                p = [random.uniform(-axes[i], axes[i]) for i in range(dim)]
+                r = 0.0
+                for i in range(dim):
+                    r += (p[i]**2)/(axes[i]**2)
+                if r <= 1:
+                    return p
+
+        @classmethod
+        def uniformly_distributed_in_hyperesphere(cls, d: int, r: float = 1.0) -> List[float]:
+            """
+            超球体内均匀分布
+
+            d 维度
+            r 半径
+            """
+            return cls.uniformly_distributed_in_hypereellipsoid([r]*d)
 
 
 class Plot3:

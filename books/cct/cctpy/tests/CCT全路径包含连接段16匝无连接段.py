@@ -9,7 +9,7 @@ sys.path.append(PathProject)
 from cctpy import *
 from agcct_connector import *
 from cctpy_ext import *
-
+import numpy
 
 try:
     from books.cct.cctpy.cctpy import *
@@ -58,7 +58,160 @@ if __name__ == "__main__":
     # connector_45_in = AGCCT_CONNECTOR(agcct4_in,agcct5_in)
     # connector_45_out = AGCCT_CONNECTOR(agcct4_out,agcct5_out)
 
-    if True:  # 二极CCT内层
+    if False: # 二极CCT内层延展
+        lcs = dicct_in.local_coordinate_system.copy()
+        lcs.location = P3.origin()
+        print(lcs)
+        def p2_func(ksi): return dicct_in.p2_function(ksi)
+
+        def p3_func(ksi): return lcs.point_to_global_coordinate(
+            dicct_in.bipolar_toroidal_coordinate_system.convert(p2_func(ksi)))
+        ksi0 = dicct_in.starting_point_in_ksi_phi_coordinate.x # 0.0
+        ksi1 = dicct_in.end_point_in_ksi_phi_coordinate.x # 128*2*π
+
+        ksi0_pre = -42*2*numpy.pi + ksi0
+        ksi1_post = 42*2*numpy.pi + ksi1
+
+        print(ksi0, ksi1)
+        print(ksi0_pre, ksi1_post)
+
+        ksi_list = BaseUtils.linspace(ksi0, ksi1, 8+1)
+
+        ksi_list_pre = BaseUtils.linspace(ksi0_pre, ksi0, 3+1)
+        ksi_list_post = BaseUtils.linspace(ksi1, ksi1_post, 3+1)
+
+        print(ksi_list)
+        print(ksi_list_pre)
+        print(ksi_list_post)
+
+        tangential_direct = BaseUtils.derivative(p3_func)
+
+        def main_normal_direct(ksi): return lcs.point_to_global_coordinate(
+            dicct_in.bipolar_toroidal_coordinate_system.main_normal_direction_at(p2_func(ksi))).normalize()
+        def second_normal_direction(ksi): return (
+            tangential_direct(ksi)@main_normal_direct(ksi)).normalize()
+
+        def path0(ksi): return p3_func(ksi)
+
+        def path1(ksi): return p3_func(ksi) + 0.5*depth * \
+            main_normal_direct(ksi) + 0.5*width*second_normal_direction(ksi)
+
+        def path2(ksi): return p3_func(ksi) - 0.5*depth * \
+            main_normal_direct(ksi) + 0.5*width*second_normal_direction(ksi)
+
+        def path3(ksi): return p3_func(ksi) - 0.5*depth * \
+            main_normal_direct(ksi) - 0.5*width*second_normal_direction(ksi)
+        def path4(ksi): return p3_func(ksi) + 0.5*depth * \
+            main_normal_direct(ksi) - 0.5*width*second_normal_direction(ksi)
+
+        numpy.savetxt('dicct_in_pre_center.txt',1000*numpy.array([P3.as_p3(path0(t)).to_list() for t in BaseUtils.linspace(ksi0_pre,ksi0,42*360)]))
+        numpy.savetxt('dicct_in_post_center.txt',1000*numpy.array([P3.as_p3(path0(t)).to_list() for t in BaseUtils.linspace(ksi1,ksi1_post,42*360)]))
+        for i in range(len(ksi_list_pre)-1):
+            print(i)
+            ksi0 = ksi_list_pre[i]
+            ksi1 = ksi_list_pre[i+1]
+            print(ksi0, ksi1)
+            numpy.savetxt(f'layer3_dicct_in_pre_1_part_{i+1}.txt', 1000*numpy.array([P3.as_p3(
+                path1(t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
+            numpy.savetxt(f'layer3_dicct_in_pre_2_part_{i+1}.txt', 1000*numpy.array([P3.as_p3(
+                path2(t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
+            numpy.savetxt(f'layer3_dicct_in_pre_3_part_{i+1}.txt', 1000*numpy.array([P3.as_p3(
+                path3(t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
+            numpy.savetxt(f'layer3_dicct_in_pre_4_part_{i+1}.txt', 1000*numpy.array([P3.as_p3(
+                path4(t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
+
+        for i in range(len(ksi_list_post)-1):
+            print(i)
+            ksi0 = ksi_list_post[i]
+            ksi1 = ksi_list_post[i+1]
+            print(ksi0, ksi1)
+            numpy.savetxt(f'layer3_dicct_in_post_1_part_{i+1}.txt', 1000*numpy.array([P3.as_p3(
+                path1(t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
+            numpy.savetxt(f'layer3_dicct_in_post_2_part_{i+1}.txt', 1000*numpy.array([P3.as_p3(
+                path2(t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
+            numpy.savetxt(f'layer3_dicct_in_post_3_part_{i+1}.txt', 1000*numpy.array([P3.as_p3(
+                path3(t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
+            numpy.savetxt(f'layer3_dicct_in_post_4_part_{i+1}.txt', 1000*numpy.array([P3.as_p3(
+                path4(t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
+        # print('down')
+
+    if False:  # 二极CCT外层
+        lcs = dicct_out.local_coordinate_system.copy()
+        lcs.location = P3.origin()
+        print(lcs)
+        def p2_func(ksi): return dicct_out.p2_function(ksi)
+
+        def p3_func(ksi): return lcs.point_to_global_coordinate(
+            dicct_out.bipolar_toroidal_coordinate_system.convert(p2_func(ksi)))
+        ksi0 = dicct_out.starting_point_in_ksi_phi_coordinate.x # 0.0
+        ksi1 = dicct_out.end_point_in_ksi_phi_coordinate.x # -128*2*π
+
+        ksi0_pre = ksi0 + 42*2*numpy.pi
+        ksi1_post = ksi1 - 42*2*numpy.pi
+
+
+        print(ksi0, ksi1)
+        print(ksi0_pre, ksi1_post)
+
+
+        ksi_list = BaseUtils.linspace(ksi0, ksi1, 8+1)
+        ksi_list_pre = BaseUtils.linspace(ksi0_pre, ksi0, 3+1)
+        ksi_list_post = BaseUtils.linspace(ksi1, ksi1_post, 3+1)
+
+        print(ksi_list)
+
+        tangential_direct = BaseUtils.derivative(p3_func)
+
+        def main_normal_direct(ksi): return lcs.point_to_global_coordinate(
+            dicct_out.bipolar_toroidal_coordinate_system.main_normal_direction_at(p2_func(ksi))).normalize()
+        def second_normal_direction(ksi): return (
+            tangential_direct(ksi)@main_normal_direct(ksi)).normalize()
+
+        def path0(ksi): return p3_func(ksi)
+
+        def path1(ksi): return p3_func(ksi) + 0.5*depth * \
+            main_normal_direct(ksi) + 0.5*width*second_normal_direction(ksi)
+
+        def path2(ksi): return p3_func(ksi) - 0.5*depth * \
+            main_normal_direct(ksi) + 0.5*width*second_normal_direction(ksi)
+
+        def path3(ksi): return p3_func(ksi) - 0.5*depth * \
+            main_normal_direct(ksi) - 0.5*width*second_normal_direction(ksi)
+        def path4(ksi): return p3_func(ksi) + 0.5*depth * \
+            main_normal_direct(ksi) - 0.5*width*second_normal_direction(ksi)
+
+        numpy.savetxt('dicct_out_pre_center.txt',1000*numpy.array([P3.as_p3(path0(t)).to_list() for t in BaseUtils.linspace(ksi0_pre,ksi0,42*360)]))
+        numpy.savetxt('dicct_out_post_center.txt',1000*numpy.array([P3.as_p3(path0(t)).to_list() for t in BaseUtils.linspace(ksi1,ksi1_post,42*360)]))
+
+        for i in range(len(ksi_list_pre)-1):
+            print(i)
+            ksi0 = ksi_list_pre[i]
+            ksi1 = ksi_list_pre[i+1]
+            print(ksi0, ksi1)
+            numpy.savetxt(f'layer4_dicct_out_pre_2_part{i+1}.txt', 1000*numpy.array([P3.as_p3(
+                path2(t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
+            numpy.savetxt(f'layer4_dicct_out_pre_3_part{i+1}.txt', 1000*numpy.array([P3.as_p3(
+                path3(t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
+            numpy.savetxt(f'layer4_dicct_out_pre_4_part{i+1}.txt', 1000*numpy.array([P3.as_p3(
+                path4(t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
+            numpy.savetxt(f'layer4_dicct_out_pre_1_part{i+1}.txt', 1000*numpy.array([P3.as_p3(
+                path1(t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
+
+        for i in range(len(ksi_list_post)-1):
+            print(i)
+            ksi0 = ksi_list_post[i]
+            ksi1 = ksi_list_post[i+1]
+            print(ksi0, ksi1)
+            numpy.savetxt(f'layer4_dicct_out_post_2_part{i+1}.txt', 1000*numpy.array([P3.as_p3(
+                path2(t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
+            numpy.savetxt(f'layer4_dicct_out_post_3_part{i+1}.txt', 1000*numpy.array([P3.as_p3(
+                path3(t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
+            numpy.savetxt(f'layer4_dicct_out_post_4_part{i+1}.txt', 1000*numpy.array([P3.as_p3(
+                path4(t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
+            numpy.savetxt(f'layer4_dicct_out_post_1_part{i+1}.txt', 1000*numpy.array([P3.as_p3(
+                path1(t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
+
+    if False:  # 二极CCT内层
         lcs = dicct_in.local_coordinate_system.copy()
         lcs.location = P3.origin()
         print(lcs)
@@ -142,7 +295,7 @@ if __name__ == "__main__":
         def path4(ksi): return p3_func(ksi) + 0.5*depth * \
             main_normal_direct(ksi) - 0.5*width*second_normal_direction(ksi)
 
-        # numpy.savetxt('dicct_out_center.txt',1000*numpy.array([P3.as_p3(path0(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
+        numpy.savetxt('dicct_out_center.txt',1000*numpy.array([P3.as_p3(path0(t)).to_list() for t in BaseUtils.linspace(ksi0,ksi1,128*360)]))
         for i in range(len(ksi_list)-1):
             print(i)
             ksi0 = ksi_list[i]
@@ -157,7 +310,7 @@ if __name__ == "__main__":
             numpy.savetxt(f'layer4_dicct_out_1_part{i+1}.txt', 1000*numpy.array([P3.as_p3(
                 path1(t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 16*360+1)]), fmt='%.4f')
 
-    if True:  # 四极CCT内层 3 匝
+    if False:  # 四极CCT内层 3 匝
         lcs = agcct3_in.local_coordinate_system.copy()
         lcs.location = P3.origin()
         print(lcs)
@@ -239,7 +392,7 @@ if __name__ == "__main__":
             t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 13*360+1)]), fmt='%.4f')
         # print('down')
 
-    if True:  # 四极CCT内层 4 匝
+    if False:  # 四极CCT内层 4 匝
         lcs = agcct3_in.local_coordinate_system.copy()
         lcs.location = P3.origin()
         print(lcs)
@@ -332,7 +485,7 @@ if __name__ == "__main__":
         numpy.savetxt('layer1_agcct2_in_4_part3.txt', 1000*numpy.array([P3.as_p3(path4(
             t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
 
-    if True:  # 四极CCT内层 5 匝
+    if False:  # 四极CCT内层 5 匝
         lcs = agcct3_in.local_coordinate_system.copy()
         lcs.location = P3.origin()
         print(lcs)
@@ -413,7 +566,7 @@ if __name__ == "__main__":
         numpy.savetxt('layer1_agcct3_in_4_part2.txt', 1000*numpy.array([P3.as_p3(path4(
             t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 17*360+1)]), fmt='%.4f')
 
-    if True:  # 四极CCT外层 3
+    if False:  # 四极CCT外层 3
         lcs = agcct3_out.local_coordinate_system.copy()
         lcs.location = P3.origin()
         print(lcs)
@@ -499,7 +652,7 @@ if __name__ == "__main__":
             t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 13*360+1)]), fmt='%.4f')
         print('down')
 
-    if True:  # 四极CCT外层 4
+    if False:  # 四极CCT外层 4
         lcs = agcct3_out.local_coordinate_system.copy()
         lcs.location = P3.origin()
         print(lcs)
@@ -598,7 +751,7 @@ if __name__ == "__main__":
             t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
         print('down')
 
-    if True:  # 四极CCT外层 5
+    if False:  # 四极CCT外层 5
         lcs = agcct3_out.local_coordinate_system.copy()
         lcs.location = P3.origin()
         print(lcs)
