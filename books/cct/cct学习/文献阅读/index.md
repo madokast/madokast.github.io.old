@@ -51,6 +51,14 @@ https://www.researchgate.net/publication/32154504_Design_and_measurement_of_a_co
 
 时间 2001 作者 A Morita，Y Iwashita，A Noda，T Shirai，M Tadokoro 机构 日本日立 Hitachi
 
+## 09 Comparison of beam optics for normal conducting and superconducting gantry beamline applied to proton therapy
+
+https://www.researchgate.net/publication/337536136_Comparison_of_beam_optics_for_normal_conducting_and_superconducting_gantry_beamlines_applied_to_proton_therapy
+
+时间 2019 作者 B Qin，R Zhao，X Liu，Q Chen，D Li 机构 HUST
+
+
+
 ## 62 Magnetic Design of a Superconducting Toroidal Gantry for Hadron Therapy
 
 ## 63 GaToroid: a Novel Toroidal Gantry for Hadron Therapy

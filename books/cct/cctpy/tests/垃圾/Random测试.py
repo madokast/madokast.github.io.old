@@ -20,6 +20,7 @@ except:
 
 
 if __name__ == "__main__":
+    BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
     if False:  # 圆周均匀分布
         pc = [BaseUtils.Random.uniformly_distributed_along_circumference()
               for i in range(100)]
@@ -169,7 +170,7 @@ if __name__ == "__main__":
         Plot2.equal()
         Plot2.show()
 
-    if True:
+    if False:
         ps = ParticleFactory.distributed_particles(
             3.5*MM, 7.5*MRAD, 3.5*MM, 7.5*MM, 0.08, 20,
             ParticleFactory.DISTRIBUTION_AREA_EDGE,
@@ -180,3 +181,48 @@ if __name__ == "__main__":
             print(s)
 
         pc = [P3(p.y, p.yp, p.delta) for p in ps]
+
+    if False:
+        p2s = []
+        for _ in range(10000):
+            p2s.append(P2(
+                BaseUtils.Random.gauss(0.0,3.5/2),
+                BaseUtils.Random.gauss(0.0,7.5/2),
+            ))
+        
+        e = BaseUtils.Ellipse.create_standard_ellipse(a=3.5,b=7.5)
+
+
+        Plot2.plot_p2s(p2s,"r.")
+        Plot2.plot(e,describe='k-')
+        Plot2.equal()
+        Plot2.show()
+
+    if False:
+        p2s = [P2.from_list(BaseUtils.Random.gauss_multi_dimension([0,0],[3.5/2,7.5/2])) for _ in range(10000)]
+        
+        e = BaseUtils.Ellipse.create_standard_ellipse(a=3.5,b=7.5)
+
+
+        Plot2.plot_p2s(p2s,"r.")
+        Plot2.plot(e,describe='k-')
+        Plot2.equal()
+        Plot2.show()
+
+    if True:
+        ps = ParticleFactory.distributed_particles(
+            3.5*MM/2, 7.5*MRAD/2, 3.5*MM/2, 7.5*MM/2, 0.08, 2000,
+            ParticleFactory.DISTRIBUTION_AREA_FULL,
+            x_distributed=True, xp_distributed=True,
+            distribution_type='gauss'
+        )
+
+        pxs = [P3(p.x, p.xp) for p in ps]
+
+        e = BaseUtils.Ellipse.create_standard_ellipse(a=3.5*MM,b=7.5*MRAD)
+
+
+        Plot2.plot_p2s(pxs,"r.")
+        Plot2.plot(e,describe='k-')
+        Plot2.equal()
+        Plot2.show()

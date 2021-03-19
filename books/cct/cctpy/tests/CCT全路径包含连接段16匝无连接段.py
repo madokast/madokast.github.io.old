@@ -27,7 +27,7 @@ if __name__ == "__main__":
         .first_drift(P2.y_direct(), BaseUtils.angle_to_radian(20)*R)
         .append_agcct(
             big_r=R,
-            small_rs=[140.5*MM, 124.5*MM, 108.5*MM, 92.5*MM],
+            small_rs=[140.5*MM + 0.1*MM, 124.5*MM+ 0.1*MM, 108.5*MM+ 0.1*MM, 92.5*MM+ 0.1*MM],
             bending_angles=[-17.05, -27.27, -23.18],  # [15.14, 29.02, 23.34]
             tilt_angles=[[30.0, 88.8, 98.1, 91.7],
                          [101.8, 30.0, 62.7, 89.7]],
@@ -38,7 +38,8 @@ if __name__ == "__main__":
         .append_drift(BaseUtils.angle_to_radian(20)*R)
     )
 
-    depth, width = 11*MM, 3.2*MM
+    # depth, width = 11*MM, 3.2*MM
+    depth, width = 10.8*MM, 2.8*MM
 
     ms = bl.magnets
     dicct_out = CCT.as_cct(ms[0])
@@ -58,7 +59,7 @@ if __name__ == "__main__":
     # connector_45_in = AGCCT_CONNECTOR(agcct4_in,agcct5_in)
     # connector_45_out = AGCCT_CONNECTOR(agcct4_out,agcct5_out)
 
-    if False: # 二极CCT内层延展
+    if True: # 二极CCT内层延展
         lcs = dicct_in.local_coordinate_system.copy()
         lcs.location = P3.origin()
         print(lcs)
@@ -135,7 +136,7 @@ if __name__ == "__main__":
                 path4(t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
         # print('down')
 
-    if False:  # 二极CCT外层
+    if True:  # 二极CCT外层延展
         lcs = dicct_out.local_coordinate_system.copy()
         lcs.location = P3.origin()
         print(lcs)
@@ -211,7 +212,7 @@ if __name__ == "__main__":
             numpy.savetxt(f'layer4_dicct_out_post_1_part{i+1}.txt', 1000*numpy.array([P3.as_p3(
                 path1(t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
 
-    if False:  # 二极CCT内层
+    if True:  # 二极CCT内层
         lcs = dicct_in.local_coordinate_system.copy()
         lcs.location = P3.origin()
         print(lcs)
@@ -310,7 +311,7 @@ if __name__ == "__main__":
             numpy.savetxt(f'layer4_dicct_out_1_part{i+1}.txt', 1000*numpy.array([P3.as_p3(
                 path1(t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 16*360+1)]), fmt='%.4f')
 
-    if False:  # 四极CCT内层 3 匝
+    if True:  # 四极CCT内层 3 匝
         lcs = agcct3_in.local_coordinate_system.copy()
         lcs.location = P3.origin()
         print(lcs)
@@ -392,7 +393,7 @@ if __name__ == "__main__":
             t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 13*360+1)]), fmt='%.4f')
         # print('down')
 
-    if False:  # 四极CCT内层 4 匝
+    if True:  # 四极CCT内层 4 匝
         lcs = agcct3_in.local_coordinate_system.copy()
         lcs.location = P3.origin()
         print(lcs)
@@ -485,7 +486,7 @@ if __name__ == "__main__":
         numpy.savetxt('layer1_agcct2_in_4_part3.txt', 1000*numpy.array([P3.as_p3(path4(
             t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
 
-    if False:  # 四极CCT内层 5 匝
+    if True:  # 四极CCT内层 5 匝
         lcs = agcct3_in.local_coordinate_system.copy()
         lcs.location = P3.origin()
         print(lcs)
@@ -566,7 +567,7 @@ if __name__ == "__main__":
         numpy.savetxt('layer1_agcct3_in_4_part2.txt', 1000*numpy.array([P3.as_p3(path4(
             t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 17*360+1)]), fmt='%.4f')
 
-    if False:  # 四极CCT外层 3
+    if True:  # 四极CCT外层 3
         lcs = agcct3_out.local_coordinate_system.copy()
         lcs.location = P3.origin()
         print(lcs)
@@ -652,7 +653,7 @@ if __name__ == "__main__":
             t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 13*360+1)]), fmt='%.4f')
         print('down')
 
-    if False:  # 四极CCT外层 4
+    if True:  # 四极CCT外层 4
         lcs = agcct3_out.local_coordinate_system.copy()
         lcs.location = P3.origin()
         print(lcs)
@@ -751,7 +752,7 @@ if __name__ == "__main__":
             t)).to_list() for t in BaseUtils.linspace(ksi0, ksi1, 14*360+1)]), fmt='%.4f')
         print('down')
 
-    if False:  # 四极CCT外层 5
+    if True:  # 四极CCT外层 5
         lcs = agcct3_out.local_coordinate_system.copy()
         lcs.location = P3.origin()
         print(lcs)
