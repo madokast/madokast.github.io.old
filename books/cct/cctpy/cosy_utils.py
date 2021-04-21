@@ -29,7 +29,7 @@ class CosyMap:
         self.map = map
         self.contributionLinesString = map.split('\n')
 
-    def apply(self, p0: PhaseSpaceParticle, order: int = 1, print_detail:bool=False) -> PhaseSpaceParticle:
+    def apply(self, p0: PhaseSpaceParticle, order: int = 1, print_detail:bool=False,file=None) -> PhaseSpaceParticle:
         """
         map 作用于相空间粒子 p0，返回作用后的结果
         order 表示需要考虑的阶数，注意应不大于构造 CosyMap 时传入的阶数
@@ -72,7 +72,10 @@ class CosyMap:
             yp += ypContribution * contributionBy
 
             if print_detail:
-                print(f"{contribution_describing} {xContribution* contributionBy} {xpContribution* contributionBy} {yContribution* contributionBy} {ypContribution* contributionBy}")
+                if file is None:
+                    print(f"{contribution_describing} {xContribution* contributionBy} {xpContribution* contributionBy} {yContribution* contributionBy} {ypContribution* contributionBy}")
+                else:
+                    print(f"{contribution_describing} {xContribution* contributionBy} {xpContribution* contributionBy} {yContribution* contributionBy} {ypContribution* contributionBy}",file=file)
 
         return PhaseSpaceParticle(x, xp, y, yp, p0.z, p0.delta)
 

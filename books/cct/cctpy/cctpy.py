@@ -268,7 +268,7 @@ class P2:
             raise ValueError(f"无法将{ndarray}转为P2或List[P2]")
 
     @classmethod
-    def from_list(cls,number_list:List) -> Union["P2", List["P2"]]:
+    def from_list(cls, number_list: List) -> Union["P2", List["P2"]]:
         """
         将 list 转为 p2 或者 p2s
         """
@@ -276,10 +276,10 @@ class P2:
         if list_len == 0:
             raise ValueError("P2.from_list number_list 长度必须大于0")
         element = number_list[0]
-        
-        if isinstance(element,int) or isinstance(element,float):
-            return P2(element,number_list[1])
-        elif isinstance(element,List):
+
+        if isinstance(element, int) or isinstance(element, float):
+            return P2(element, number_list[1])
+        elif isinstance(element, List):
             return [cls.from_list(number_list[i]) for i in range(list_len)]
         else:
             raise ValueError(f"P2.from_list 无法将{number_list}转为P2/ P2s")
@@ -1126,10 +1126,9 @@ class StraightLine2(Line2):
             return -1
         else:
             return 0
-    
 
     @staticmethod
-    def calculate_k_b(p1:P2,p2:P2)->Tuple[float]:
+    def calculate_k_b(p1: P2, p2: P2) -> Tuple[float]:
         """
         求过两点的直线方程
         y = kx + d
@@ -1139,7 +1138,7 @@ class StraightLine2(Line2):
         k = (p2.y-p1.y)/(p2.x-p1.x)
         b = p2.y - k * p2.x
 
-        return (k,b)
+        return (k, b)
 
 
 class ArcLine2(Line2):
@@ -3226,7 +3225,7 @@ class ParticleFactory:
                 ParticleFactory.DISTRIBUTION_AREA_EDGE,
                 x_distributed=True, xp_distributed=True, delta_distributed=True
             )
-            
+
         since v0.1.4
         """
         params = [x, xp, y, yp, delta]  # 全部参数
@@ -3301,7 +3300,8 @@ class ParticleFactory:
                 raise ValueError("高斯分布下不支持边缘分布")
             elif distribution_area == cls.DISTRIBUTION_AREA_FULL:
                 distribution = [
-                    BaseUtils.Random.gauss_multi_dimension([0.0]*dim,variables)
+                    BaseUtils.Random.gauss_multi_dimension(
+                        [0.0]*dim, variables)
                     for ignore in range(number)
                 ]
             else:
@@ -3313,7 +3313,7 @@ class ParticleFactory:
         ps: List[PhaseSpaceParticle] = []
         for i in range(number):
             cur_params: List[float] = []
-            distribution_index:int = 0
+            distribution_index: int = 0
             for j in range(len(params)):
                 if distributed[j]:
                     # 变量
@@ -3687,7 +3687,8 @@ class CCT(Magnet, ApertureObject):
                 y_direction=-start_direct.to_p3(),  # diff
                 z_direction=P3.z_direct(),
             )
-        else:  # pos = -1  # center 在 (start_direct, start_point) 左侧，因此顺时针偏转 # 写错了？应该是逆时针时针
+        # pos = -1  # center 在 (start_direct, start_point) 左侧，因此顺时针偏转 # 写错了？应该是逆时针时针
+        else:
             lcs = LocalCoordinateSystem.create_by_y_and_z_direction(
                 location=center.to_p3(),
                 y_direction=start_direct.to_p3(),  # diff
@@ -3790,38 +3791,37 @@ class CCT(Magnet, ApertureObject):
         return anything
 
     @staticmethod
-    def calculate_a(big_r:float,small_r:float):
+    def calculate_a(big_r: float, small_r: float):
         """
         计算极点 a 值的小方法
         """
 
         return math.sqrt(big_r ** 2 - small_r ** 2)
-    
+
     @staticmethod
-    def calculate_eta(big_r:float,small_r:float):
+    def calculate_eta(big_r: float, small_r: float):
         """
         计算 eta 值的小方法
         """
 
-        return 0.5 * math.log((big_r + CCT.calculate_a(big_r,small_r)) \
-            / (big_r - CCT.calculate_a(big_r,small_r)))
+        return 0.5 * math.log((big_r + CCT.calculate_a(big_r, small_r))
+                              / (big_r - CCT.calculate_a(big_r, small_r)))
 
     @staticmethod
-    def calculate_cheta(big_r:float,small_r:float):
+    def calculate_cheta(big_r: float, small_r: float):
         """
         计算 ch(eta) 值的小方法
         """
 
-        return math.cosh(CCT.calculate_eta(big_r,small_r))
+        return math.cosh(CCT.calculate_eta(big_r, small_r))
 
     @staticmethod
-    def calculate_sheta(big_r:float,small_r:float):
+    def calculate_sheta(big_r: float, small_r: float):
         """
         计算 sh(eta) 值的小方法
         """
 
-        return math.sinh(CCT.calculate_eta(big_r,small_r))
-
+        return math.sinh(CCT.calculate_eta(big_r, small_r))
 
 
 class QS(Magnet, ApertureObject):
@@ -3859,7 +3859,7 @@ class QS(Magnet, ApertureObject):
         """
         since v0.1.1
         """
-        return f"local_coordinate_system={self.local_coordinate_system}, length={self.length}, gradient={self.gradient}, second_gradient={self.second_gradient}, aperture_radius={self.aperture_radius}"
+        return f"QS:local_coordinate_system={self.local_coordinate_system}, length={self.length}, gradient={self.gradient}, second_gradient={self.second_gradient}, aperture_radius={self.aperture_radius}"
 
     def __repr__(self) -> str:
         """
@@ -3961,7 +3961,7 @@ class Beamline(Line2, Magnet, ApertureObject):
         # 元件由三部分组成，位置、元件自身、长度
         # 其中位置表示沿着 Beamline 的长度
         # 元件自身，使用 None 表示漂移段。
-        self.elements:List[Tuple[float,Magnet,float]]=[]
+        self.elements: List[Tuple[float, Magnet, float]] = []
 
     def magnetic_field_at(self, point: P3) -> P3:
         """
@@ -4228,11 +4228,11 @@ class Beamline(Line2, Magnet, ApertureObject):
             Beamline 中第一个元件必须是 drift
             """
             bl = Beamline(
-                    Trajectory.set_start_point(self.start_point).first_line(
+                Trajectory.set_start_point(self.start_point).first_line(
                     direct=direct, length=length
-                    )
                 )
-            bl.elements.append((0,None,length))
+            )
+            bl.elements.append((0, None, length))
             return bl
 
     @staticmethod
@@ -4249,7 +4249,7 @@ class Beamline(Line2, Magnet, ApertureObject):
         """
         old_len = self.trajectory.get_length()
         self.trajectory.add_strait_line(length=length)
-        self.elements.append((old_len,None,length))
+        self.elements.append((old_len, None, length))
 
         return self
 
@@ -4270,18 +4270,18 @@ class Beamline(Line2, Magnet, ApertureObject):
         """
         old_length = self.trajectory.get_length()
         self.trajectory.add_strait_line(length=length)
-        
+
         qs = QS.create_qs_along(
-                trajectory=self.trajectory,
-                s=old_length,
-                length=length,
-                gradient=gradient,
-                second_gradient=second_gradient,
-                aperture_radius=aperture_radius,
-            )
+            trajectory=self.trajectory,
+            s=old_length,
+            length=length,
+            gradient=gradient,
+            second_gradient=second_gradient,
+            aperture_radius=aperture_radius,
+        )
 
         self.magnets.append(qs)
-        self.elements.append((old_length,qs,length))
+        self.elements.append((old_length, qs, length))
 
         return self
 
@@ -4315,42 +4315,42 @@ class Beamline(Line2, Magnet, ApertureObject):
         )
 
         cct_inner = CCT.create_cct_along(
-                    trajectory=self.trajectory,
-                    s=old_length,
-                    big_r=big_r,
-                    small_r=small_r_inner,
-                    bending_angle=abs(bending_angle),
-                    tilt_angles=tilt_angles,
-                    winding_number=winding_number,
-                    current=current,
-                    starting_point_in_ksi_phi_coordinate=P2.origin(),
-                    end_point_in_ksi_phi_coordinate=P2(
-                        2 * math.pi * winding_number,
-                        BaseUtils.angle_to_radian(bending_angle),
-                    ),
-                    disperse_number_per_winding=disperse_number_per_winding,
-                )
+            trajectory=self.trajectory,
+            s=old_length,
+            big_r=big_r,
+            small_r=small_r_inner,
+            bending_angle=abs(bending_angle),
+            tilt_angles=tilt_angles,
+            winding_number=winding_number,
+            current=current,
+            starting_point_in_ksi_phi_coordinate=P2.origin(),
+            end_point_in_ksi_phi_coordinate=P2(
+                2 * math.pi * winding_number,
+                BaseUtils.angle_to_radian(bending_angle),
+            ),
+            disperse_number_per_winding=disperse_number_per_winding,
+        )
         self.magnets.append(cct_inner)
-        self.elements.append((old_length,cct_inner,cct_length))
+        self.elements.append((old_length, cct_inner, cct_length))
 
         cct_outer = CCT.create_cct_along(
-                    trajectory=self.trajectory,
-                    s=old_length,
-                    big_r=big_r,
-                    small_r=small_r_outer,
-                    bending_angle=abs(bending_angle),
-                    tilt_angles=BaseUtils.list_multiply(tilt_angles, -1),
-                    winding_number=winding_number,
-                    current=current,
-                    starting_point_in_ksi_phi_coordinate=P2.origin(),
-                    end_point_in_ksi_phi_coordinate=P2(
-                        -2 * math.pi * winding_number,
-                        BaseUtils.angle_to_radian(bending_angle),
-                    ),
-                    disperse_number_per_winding=disperse_number_per_winding,
-                )
+            trajectory=self.trajectory,
+            s=old_length,
+            big_r=big_r,
+            small_r=small_r_outer,
+            bending_angle=abs(bending_angle),
+            tilt_angles=BaseUtils.list_multiply(tilt_angles, -1),
+            winding_number=winding_number,
+            current=current,
+            starting_point_in_ksi_phi_coordinate=P2.origin(),
+            end_point_in_ksi_phi_coordinate=P2(
+                -2 * math.pi * winding_number,
+                BaseUtils.angle_to_radian(bending_angle),
+            ),
+            disperse_number_per_winding=disperse_number_per_winding,
+        )
         self.magnets.append(cct_outer)
-        self.elements.append((old_length,cct_outer,cct_length))
+        self.elements.append((old_length, cct_outer, cct_length))
 
         return self
 
@@ -4394,7 +4394,8 @@ class Beamline(Line2, Magnet, ApertureObject):
 
         total_bending_angle = sum(bending_angles)
         old_length = self.trajectory.get_length()
-        cct_length = big_r * abs(BaseUtils.angle_to_radian(total_bending_angle))
+        cct_length = big_r * \
+            abs(BaseUtils.angle_to_radian(total_bending_angle))
         self.trajectory.add_arc_line(
             radius=big_r,
             clockwise=total_bending_angle < 0,
@@ -4403,43 +4404,43 @@ class Beamline(Line2, Magnet, ApertureObject):
 
         # 构建二极 CCT 外层
         cct2_outer = CCT.create_cct_along(
-                    trajectory=self.trajectory,
-                    s=old_length,
-                    big_r=big_r,
-                    small_r=small_rs[0],
-                    bending_angle=abs(total_bending_angle),
-                    tilt_angles=BaseUtils.list_multiply(tilt_angles[0], -1),
-                    winding_number=winding_numbers[0][0],
-                    current=currents[0],
-                    starting_point_in_ksi_phi_coordinate=P2.origin(),
-                    end_point_in_ksi_phi_coordinate=P2(
-                        -2 * math.pi * winding_numbers[0][0],
-                        BaseUtils.angle_to_radian(total_bending_angle),
-                    ),
-                    disperse_number_per_winding=disperse_number_per_winding,
-                )
+            trajectory=self.trajectory,
+            s=old_length,
+            big_r=big_r,
+            small_r=small_rs[0],
+            bending_angle=abs(total_bending_angle),
+            tilt_angles=BaseUtils.list_multiply(tilt_angles[0], -1),
+            winding_number=winding_numbers[0][0],
+            current=currents[0],
+            starting_point_in_ksi_phi_coordinate=P2.origin(),
+            end_point_in_ksi_phi_coordinate=P2(
+                -2 * math.pi * winding_numbers[0][0],
+                BaseUtils.angle_to_radian(total_bending_angle),
+            ),
+            disperse_number_per_winding=disperse_number_per_winding,
+        )
         self.magnets.append(cct2_outer)
-        self.elements.append((old_length,cct2_outer,cct_length))
+        self.elements.append((old_length, cct2_outer, cct_length))
 
         # 构建二极 CCT 内层
         cct2_innter = CCT.create_cct_along(
-                    trajectory=self.trajectory,
-                    s=old_length,
-                    big_r=big_r,
-                    small_r=small_rs[1],
-                    bending_angle=abs(total_bending_angle),
-                    tilt_angles=tilt_angles[0],
-                    winding_number=winding_numbers[0][0],
-                    current=currents[0],
-                    starting_point_in_ksi_phi_coordinate=P2.origin(),
-                    end_point_in_ksi_phi_coordinate=P2(
-                        2 * math.pi * winding_numbers[0][0],
-                        BaseUtils.angle_to_radian(total_bending_angle),
-                    ),
-                    disperse_number_per_winding=disperse_number_per_winding,
-                )
+            trajectory=self.trajectory,
+            s=old_length,
+            big_r=big_r,
+            small_r=small_rs[1],
+            bending_angle=abs(total_bending_angle),
+            tilt_angles=tilt_angles[0],
+            winding_number=winding_numbers[0][0],
+            current=currents[0],
+            starting_point_in_ksi_phi_coordinate=P2.origin(),
+            end_point_in_ksi_phi_coordinate=P2(
+                2 * math.pi * winding_numbers[0][0],
+                BaseUtils.angle_to_radian(total_bending_angle),
+            ),
+            disperse_number_per_winding=disperse_number_per_winding,
+        )
         self.magnets.append(cct2_innter)
-        self.elements.append((old_length,cct2_innter,cct_length))
+        self.elements.append((old_length, cct2_innter, cct_length))
 
         # 构建内外侧四极交变 CCT
         # 提取参数
@@ -4470,39 +4471,42 @@ class Beamline(Line2, Magnet, ApertureObject):
             agcct_bending_angles_rad[agcct_index],
         )
         agcct_part1_inner = CCT.create_cct_along(
-                trajectory=self.trajectory,
-                s=old_length,
-                big_r=big_r,
-                small_r=agcct_small_r_in,
-                bending_angle=abs(agcct_bending_angles[agcct_index]),
-                tilt_angles=BaseUtils.list_multiply(agcct_tilt_angles, -1),
-                winding_number=agcct_winding_nums[agcct_index],
-                current=agcct_current,
-                starting_point_in_ksi_phi_coordinate=agcct_start_in,
-                end_point_in_ksi_phi_coordinate=agcct_end_in,
-                disperse_number_per_winding=disperse_number_per_winding,
-            )
-        agcct_part1_length = big_r * BaseUtils.angle_to_radian(abs(agcct_bending_angles[agcct_index]))
+            trajectory=self.trajectory,
+            s=old_length,
+            big_r=big_r,
+            small_r=agcct_small_r_in,
+            bending_angle=abs(agcct_bending_angles[agcct_index]),
+            tilt_angles=BaseUtils.list_multiply(agcct_tilt_angles, -1),
+            winding_number=agcct_winding_nums[agcct_index],
+            current=agcct_current,
+            starting_point_in_ksi_phi_coordinate=agcct_start_in,
+            end_point_in_ksi_phi_coordinate=agcct_end_in,
+            disperse_number_per_winding=disperse_number_per_winding,
+        )
+        agcct_part1_length = big_r * \
+            BaseUtils.angle_to_radian(abs(agcct_bending_angles[agcct_index]))
         self.magnets.append(agcct_part1_inner)
-        self.elements.append((old_length,agcct_part1_inner,agcct_part1_length))
+        self.elements.append(
+            (old_length, agcct_part1_inner, agcct_part1_length))
 
         agcct_part1_outer = CCT.create_cct_along(
-                trajectory=self.trajectory,
-                s=old_length,
-                big_r=big_r,
-                small_r=agcct_small_r_out,
-                bending_angle=abs(agcct_bending_angles[agcct_index]),
-                tilt_angles=agcct_tilt_angles,
-                winding_number=agcct_winding_nums[agcct_index],
-                current=agcct_current,
-                starting_point_in_ksi_phi_coordinate=agcct_start_out,
-                end_point_in_ksi_phi_coordinate=agcct_end_out,
-                disperse_number_per_winding=disperse_number_per_winding,
-            )
+            trajectory=self.trajectory,
+            s=old_length,
+            big_r=big_r,
+            small_r=agcct_small_r_out,
+            bending_angle=abs(agcct_bending_angles[agcct_index]),
+            tilt_angles=agcct_tilt_angles,
+            winding_number=agcct_winding_nums[agcct_index],
+            current=agcct_current,
+            starting_point_in_ksi_phi_coordinate=agcct_start_out,
+            end_point_in_ksi_phi_coordinate=agcct_end_out,
+            disperse_number_per_winding=disperse_number_per_winding,
+        )
         self.magnets.append(agcct_part1_outer)
-        self.elements.append((old_length,agcct_part1_outer,agcct_part1_length))
+        self.elements.append(
+            (old_length, agcct_part1_outer, agcct_part1_length))
 
-        old_length_i = old_length+ agcct_part1_length
+        old_length_i = old_length + agcct_part1_length
         # 构建 part2 和之后的 part
         for ignore in range(len(agcct_bending_angles) - 1):
             agcct_index += 1
@@ -4529,39 +4533,43 @@ class Beamline(Line2, Magnet, ApertureObject):
                 agcct_bending_angles_rad[agcct_index],
             )
             agcct_parti_inner = CCT.create_cct_along(
-                    trajectory=self.trajectory,
-                    s=old_length,
-                    big_r=big_r,
-                    small_r=agcct_small_r_in,
-                    bending_angle=abs(agcct_bending_angles[agcct_index]),
-                    tilt_angles=BaseUtils.list_multiply(agcct_tilt_angles, -1),
-                    winding_number=agcct_winding_nums[agcct_index],
-                    current=agcct_current,
-                    starting_point_in_ksi_phi_coordinate=agcct_start_in,
-                    end_point_in_ksi_phi_coordinate=agcct_end_in,
-                    disperse_number_per_winding=disperse_number_per_winding,
-                )
-            agcct_parti_length = big_r * BaseUtils.angle_to_radian(abs(agcct_bending_angles[agcct_index]))
+                trajectory=self.trajectory,
+                s=old_length,
+                big_r=big_r,
+                small_r=agcct_small_r_in,
+                bending_angle=abs(agcct_bending_angles[agcct_index]),
+                tilt_angles=BaseUtils.list_multiply(agcct_tilt_angles, -1),
+                winding_number=agcct_winding_nums[agcct_index],
+                current=agcct_current,
+                starting_point_in_ksi_phi_coordinate=agcct_start_in,
+                end_point_in_ksi_phi_coordinate=agcct_end_in,
+                disperse_number_per_winding=disperse_number_per_winding,
+            )
+            agcct_parti_length = big_r * \
+                BaseUtils.angle_to_radian(
+                    abs(agcct_bending_angles[agcct_index]))
             self.magnets.append(agcct_parti_inner)
-            self.elements.append((old_length_i,agcct_parti_inner,agcct_parti_length))
+            self.elements.append(
+                (old_length_i, agcct_parti_inner, agcct_parti_length))
 
             agcct_parti_outer = CCT.create_cct_along(
-                    trajectory=self.trajectory,
-                    s=old_length,
-                    big_r=big_r,
-                    small_r=agcct_small_r_out,
-                    bending_angle=abs(agcct_bending_angles[agcct_index]),
-                    tilt_angles=agcct_tilt_angles,
-                    winding_number=agcct_winding_nums[agcct_index],
-                    current=agcct_current,
-                    starting_point_in_ksi_phi_coordinate=agcct_start_out,
-                    end_point_in_ksi_phi_coordinate=agcct_end_out,
-                    disperse_number_per_winding=disperse_number_per_winding,
-                )
+                trajectory=self.trajectory,
+                s=old_length,
+                big_r=big_r,
+                small_r=agcct_small_r_out,
+                bending_angle=abs(agcct_bending_angles[agcct_index]),
+                tilt_angles=agcct_tilt_angles,
+                winding_number=agcct_winding_nums[agcct_index],
+                current=agcct_current,
+                starting_point_in_ksi_phi_coordinate=agcct_start_out,
+                end_point_in_ksi_phi_coordinate=agcct_end_out,
+                disperse_number_per_winding=disperse_number_per_winding,
+            )
             self.magnets.append(agcct_parti_outer)
-            self.elements.append((old_length_i,agcct_parti_outer,agcct_parti_length))
+            self.elements.append(
+                (old_length_i, agcct_parti_outer, agcct_parti_length))
 
-            old_length_i+=agcct_parti_length
+            old_length_i += agcct_parti_length
 
         return self
 
@@ -5036,7 +5044,7 @@ class BaseUtils:
             return points
 
         @classmethod
-        def create_standard_ellipse(cls,a:float,b:float)->"BaseUtils.Ellipse":
+        def create_standard_ellipse(cls, a: float, b: float) -> "BaseUtils.Ellipse":
             """
             构建标准椭圆
             x**2/a**2+y**2/b**2 = 1
@@ -5049,7 +5057,7 @@ class BaseUtils:
 
             since 0.1.4
             """
-            return BaseUtils.Ellipse(A=b**2,B=0.0,C=a**2,D=(a**2) * (b**2))
+            return BaseUtils.Ellipse(A=b**2, B=0.0, C=a**2, D=(a**2) * (b**2))
 
     class Statistic:
         """
@@ -5424,16 +5432,16 @@ class BaseUtils:
             return cls.uniformly_distributed_in_hypereellipsoid([r]*d)
 
         @classmethod
-        def gauss(cls,mu:float=0.0, sigma:float=1.0)->float:
+        def gauss(cls, mu: float = 0.0, sigma: float = 1.0) -> float:
             """
             高斯分布
 
             since v0.1.4
             """
-            return random.gauss(mu,sigma)
+            return random.gauss(mu, sigma)
 
         @classmethod
-        def gauss_multi_dimension(cls,mu_list:List[float],sigma_list:List[float]) -> List[float]:
+        def gauss_multi_dimension(cls, mu_list: List[float], sigma_list: List[float]) -> List[float]:
             """
             多维无关高斯分布
 
@@ -5443,9 +5451,10 @@ class BaseUtils:
             len_sigma = len(sigma_list)
 
             if len_mu != len_sigma:
-                raise ValueError("gauss_multi_dimension mu_list 和 sigma_list 维度不同一")
+                raise ValueError(
+                    "gauss_multi_dimension mu_list 和 sigma_list 维度不同一")
 
-            return [cls.gauss(mu_list[i],sigma_list[i]) for i in range(len_mu)]
+            return [cls.gauss(mu_list[i], sigma_list[i]) for i in range(len_mu)]
 
 
 class Plot3:
@@ -5538,7 +5547,7 @@ class Plot3:
         包括 beamline 上的磁铁和设计轨道
         """
         size = len(beamline.magnets)
-        for i in range(1,size+1):
+        for i in range(1, size+1):
             b = beamline.magnets[i-1]
             d = describes[i] if i < len(describes) else describes[-1]
             if isinstance(b, QS):
@@ -5701,6 +5710,7 @@ class Plot3:
 
 class Plot2:
     INIT = False  # 是否初始化
+    PLT = plt
 
     @staticmethod
     def __init():
@@ -5742,10 +5752,10 @@ class Plot2:
                 Plot2.plot_beamline(param1, describes=["k-", "r-"])
             elif isinstance(param1, Line2):
                 Plot2.plot_line2(param1, describe=describe)
-            elif isinstance(param1,BaseUtils.Ellipse):
+            elif isinstance(param1, BaseUtils.Ellipse):
                 p2s = param1.uniform_distribution_points_along_edge(64)
                 p2s.append(p2s[0])
-                Plot2.plot(p2s,describe=describe)
+                Plot2.plot(p2s, describe=describe)
             else:
                 print(f"无法绘制{data}")
 
@@ -5888,7 +5898,7 @@ class Plot2:
         Plot2.plot_p2s([left_points[-1], right_points[-1]], describe=describe)
 
     @staticmethod
-    def plot_cct_outline_straight(location:float,cct: CCT,length:float, describe="r-") -> None:
+    def plot_cct_outline_straight(location: float, cct: CCT, length: float, describe="r-") -> None:
         """
         直线版本，配合 plot_beamline_straight
         """
@@ -5899,12 +5909,10 @@ class Plot2:
         p1 = start_point + y*cct.small_r
         p4 = start_point - y*cct.small_r
 
-        p2 = p1+ x*length
-        p3 = p4+ x*length
+        p2 = p1 + x*length
+        p3 = p4 + x*length
 
-        Plot2.plot_p2s([p1,p2,p3,p4,p1],describe=describe)
-
-
+        Plot2.plot_p2s([p1, p2, p3, p4, p1], describe=describe)
 
     @staticmethod
     def plot_qs(qs: QS, describe="r-") -> None:
@@ -5927,26 +5935,27 @@ class Plot2:
 
         outline_2d = [p.to_p2() for p in outline]
         Plot2.plot_p2s(outline_2d, describe)
-    
+
     @staticmethod
-    def plot_qs_straight(location:float,qs: QS,length:float, describe="k-") -> None:
+    def plot_qs_straight(location: float, qs: QS, length: float, describe="k-") -> None:
         """
         绘制 qs
         轨道绘制为直线，配合 plot_beamline_straight
         """
         start_point = P2(x=location)
-        x =P2.x_direct()
+        x = P2.x_direct()
         y = None
-        
-        if qs.gradient >=0 :
+
+        if qs.gradient >= 0:
             y = P2.y_direct()
         else:
             y = -P2.y_direct()
 
         p1 = start_point + x*length
         p2 = p1 + y*qs.aperture_radius
-        p3 = start_point+ y*qs.aperture_radius
-        Plot2.plot_p2s([start_point,p1,p2,p3,start_point],describe=describe)
+        p3 = start_point + y*qs.aperture_radius
+        Plot2.plot_p2s([start_point, p1, p2, p3, start_point],
+                       describe=describe)
 
     @staticmethod
     def plot_beamline(beamline: Beamline, describes=["r-"]) -> None:
@@ -5987,12 +5996,13 @@ class Plot2:
                 pass
             else:
                 if isinstance(b, QS):
-                    Plot2.plot_qs_straight(loc,b,length,describe=d)
+                    Plot2.plot_qs_straight(loc, b, length, describe=d)
                 elif isinstance(b, CCT):
-                    Plot2.plot_cct_outline_straight(loc,b,length,describe=d)
+                    Plot2.plot_cct_outline_straight(loc, b, length, describe=d)
                 else:
                     print(f"无法绘制{b}")
-        Plot2.plot_p2s([P2.origin(),P2(x=beamline.trajectory.get_length())], describe=describes[0])
+        Plot2.plot_p2s(
+            [P2.origin(), P2(x=beamline.trajectory.get_length())], describe=describes[0])
 
     @staticmethod
     def plot_line2(line: Line2, step: float = 1 * MM, describe="r-") -> None:
@@ -6061,7 +6071,7 @@ class Plot2:
         plt.axis("equal")
 
     @staticmethod
-    def xlim(x_min:float,x_max:float):
+    def xlim(x_min: float, x_max: float):
         """
         设置坐标轴范围
 
@@ -6069,10 +6079,10 @@ class Plot2:
         """
         if not Plot2.INIT:
             Plot2.__init()
-        plt.xlim(x_min,x_max)
+        plt.xlim(x_min, x_max)
 
     @staticmethod
-    def ylim(y_min:float,y_max:float):
+    def ylim(y_min: float, y_max: float):
         """
         设置坐标轴范围
 
@@ -6080,8 +6090,7 @@ class Plot2:
         """
         if not Plot2.INIT:
             Plot2.__init()
-        plt.ylim(y_min,y_max)
-
+        plt.ylim(y_min, y_max)
 
     @staticmethod
     def info(
@@ -6440,7 +6449,7 @@ class HUST_SC_GANTRY:
 
 def beamline_phase_ellipse_multi_delta(bl: Beamline, particle_number: int,
                                        dps: List[float], describles: str = ['r-', 'y-', 'b-', 'k-', 'g-', 'c-', 'm-'],
-                                       foot_step: float = 10*MM,report:bool=True):
+                                       foot_step: float = 10*MM, report: bool = True):
     if len(dps) > len(describles):
         print(
             f'describles(size={len(describles)}) 长度应大于等于 dps(size={len(dps)})')
@@ -6589,7 +6598,7 @@ if __name__ == "__main__":
 
         # cct: CCT = (bl.magnets[0])
         # print(cct.conductor_length())
-    if False: # 束斑绘制
+    if True:  # 束斑绘制
         BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
 
         data = [4.675,	41.126 	, 88.773,	98.139,
@@ -6627,9 +6636,9 @@ if __name__ == "__main__":
             qs3_length=0.24379,
 
             agcct345_inner_small_r=92.5 * MM + 0.1*MM,  # 92.5
-            agcct345_outer_small_r=108.5 * MM+ 0.1*MM,  # 83+15
-            dicct345_inner_small_r=124.5 * MM+ 0.1*MM,  # 83+30+1
-            dicct345_outer_small_r=140.5 * MM+ 0.1*MM,  # 83+45 +2
+            agcct345_outer_small_r=108.5 * MM + 0.1*MM,  # 83+15
+            dicct345_inner_small_r=124.5 * MM + 0.1*MM,  # 83+30+1
+            dicct345_outer_small_r=140.5 * MM + 0.1*MM,  # 83+45 +2
         )
         bl_all = gantry.create_beamline()
 
@@ -6649,34 +6658,37 @@ if __name__ == "__main__":
             bl.trajectory, length, 215
         )
 
-        particle_number=640*3
-        dp = -0.07
+        particle_number = 400*12
+        dp = 0.05
         ps_x = ParticleFactory.distributed_particles(
-            3.5*MM, 7.5*MRAD, 3.5*MM, 7.5*MRAD, dp, particle_number,
+            3.5*MM/2, 7.5*MRAD/2, 0, 0, dp, particle_number,
             ParticleFactory.DISTRIBUTION_AREA_FULL,
-            x_distributed=True, xp_distributed=True
+            x_distributed=True, xp_distributed=True,
+            distribution_type='gauss'
         )
 
         ps_y = ParticleFactory.distributed_particles(
-            3.5*MM, 7.5*MRAD, 3.5*MM, 7.5*MRAD, dp, particle_number,
+            0, 0, 3.5*MM/2, 7.5*MRAD/2, dp, particle_number,
             ParticleFactory.DISTRIBUTION_AREA_FULL,
-            y_distributed=True, yp_distributed=True
+            y_distributed=True, yp_distributed=True,
+            distribution_type='gauss'
         )
 
         ps = []
         for i in range(len(ps_x)):
             ps.append(PhaseSpaceParticle(
-                x = ps_x[i].x,
-                xp= ps_x[i].xp,
-                y= ps_y[i].y,
-                yp= ps_y[i].yp,
-                z = 0.0,
-                delta = 0.0
+                x=ps_x[i].x,
+                y=ps_y[i].y,
+                xp=ps_x[i].xp,
+                yp=ps_y[i].yp,
+                z=0,
+                delta=dp
             ))
-        
-        rps = ParticleFactory.create_from_phase_space_particles(ip_start,ip_start.get_natural_coordinate_system(),ps)
 
-        ParticleRunner.run_only(rps,bl,length,concurrency_level=16)
+        rps = ParticleFactory.create_from_phase_space_particles(
+            ip_start, ip_start.get_natural_coordinate_system(), ps)
+
+        ParticleRunner.run_only(rps, bl, length, concurrency_level=13)
 
         pp_end = PhaseSpaceParticle.create_from_running_particles(
             ideal_particle=ip_end,
@@ -6685,19 +6697,19 @@ if __name__ == "__main__":
         )
 
         f = open("out.txt", "w")
-        
-        xy = [P2(pp.x,pp.y)*1000 for pp in pp_end]
-        for p2 in xy:
-            print(f"{p2.x} {p2.y}",file=f,flush=True)
 
-        Plot2.plot(xy,describe='r.')
+        xy = [P2(pp.x, pp.y)*1000 for pp in pp_end if pp.x<15*MM and pp.y<15*MM]
+        for p2 in xy:
+            print(f"{p2.x} {p2.y}", file=f, flush=True)
+
+        Plot2.plot(xy, describe='r.')
         # Plot2.plot(BaseUtils.Ellipse.create_standard_ellipse(3.5,3.5),describe='k-')
 
         Plot2.equal()
 
         Plot2.show()
 
-    if True: # track 轨迹
+    if False:  # track 轨迹
         BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
 
         data = [4.675,	41.126 	, 88.773,	98.139,
@@ -6735,9 +6747,9 @@ if __name__ == "__main__":
             qs3_length=0.24379,
 
             agcct345_inner_small_r=92.5 * MM + 0.1*MM,  # 92.5
-            agcct345_outer_small_r=108.5 * MM+ 0.1*MM,  # 83+15
-            dicct345_inner_small_r=124.5 * MM+ 0.1*MM,  # 83+30+1
-            dicct345_outer_small_r=140.5 * MM+ 0.1*MM,  # 83+45 +2
+            agcct345_outer_small_r=108.5 * MM + 0.1*MM,  # 83+15
+            dicct345_inner_small_r=124.5 * MM + 0.1*MM,  # 83+30+1
+            dicct345_outer_small_r=140.5 * MM + 0.1*MM,  # 83+45 +2
         )
         bl_all = gantry.create_beamline()
 
@@ -6768,27 +6780,28 @@ if __name__ == "__main__":
             number=num
         )
 
-        rps = ParticleFactory.create_from_phase_space_particles(ip_start,ip_start.get_natural_coordinate_system(),ps)
+        rps = ParticleFactory.create_from_phase_space_particles(
+            ip_start, ip_start.get_natural_coordinate_system(), ps)
         for rp in rps:
             print(rp)
-            all_info = ParticleRunner.run_get_all_info(rp,bl,bl.get_length(),footstep=10*MM)
-            track:List[P2]=[]
+            all_info = ParticleRunner.run_get_all_info(
+                rp, bl, bl.get_length(), footstep=10*MM)
+            track: List[P2] = []
             for p in all_info:
-                run_ip = ParticleFactory.create_proton_along(bl.trajectory, p.distance, 215)
-                run_pp = PhaseSpaceParticle.create_from_running_particle(run_ip,run_ip.get_natural_coordinate_system(),p)
+                run_ip = ParticleFactory.create_proton_along(
+                    bl.trajectory, p.distance, 215)
+                run_pp = PhaseSpaceParticle.create_from_running_particle(
+                    run_ip, run_ip.get_natural_coordinate_system(), p)
                 if x_plane:
-                    track.append(P2(p.distance,run_pp.x/MM))
+                    track.append(P2(p.distance, run_pp.x/MM))
                 else:
-                    track.append(P2(p.distance,run_pp.y/MM))
-                Plot2.plot_p2s(track,describe='b-')
-                
-
-        
+                    track.append(P2(p.distance, run_pp.y/MM))
+                Plot2.plot_p2s(track, describe='b-')
 
         # Plot2.plot_beamline_straight(bl)
         # Plot2.plot_p2s([P2.origin(),P2(x=bl.get_length())])
-        Plot2.ylim(-0.06/MM,+0.10/MM)
-        Plot2.info("s/m","y/mm","",font_size=30)
+        Plot2.ylim(-0.06/MM, +0.10/MM)
+        Plot2.info("s/m", "y/mm", "", font_size=30)
         Plot2.show()
 
     if False:
@@ -6829,9 +6842,9 @@ if __name__ == "__main__":
             qs3_length=0.24379,
 
             agcct345_inner_small_r=92.5 * MM + 0.1*MM,  # 92.5
-            agcct345_outer_small_r=108.5 * MM+ 0.1*MM,  # 83+15
-            dicct345_inner_small_r=124.5 * MM+ 0.1*MM,  # 83+30+1
-            dicct345_outer_small_r=140.5 * MM+ 0.1*MM,  # 83+45 +2
+            agcct345_outer_small_r=108.5 * MM + 0.1*MM,  # 83+15
+            dicct345_inner_small_r=124.5 * MM + 0.1*MM,  # 83+30+1
+            dicct345_outer_small_r=140.5 * MM + 0.1*MM,  # 83+45 +2
         )
         bl_all = gantry.create_beamline()
 
@@ -6844,11 +6857,11 @@ if __name__ == "__main__":
 
         beamline_phase_ellipse_multi_delta(
             # [-0.05, -0.025, 0, +0.025, 0.05]
-            bl, 8, BaseUtils.list_multiply([-10,-9,-8],0.01),
-            describles=['r-', 'y-', 'b-', 'k-', 'g-', 'c-', 'm-', 'r--', 'y--'],
+            bl, 8, BaseUtils.list_multiply([-10, -9, -8], 0.01),
+            describles=['r-', 'y-', 'b-', 'k-',
+                        'g-', 'c-', 'm-', 'r--', 'y--'],
             foot_step=20*MM,
             report=True
         )
 
         plt.show()
-

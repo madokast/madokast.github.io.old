@@ -44,7 +44,7 @@ def density_scatter( x , y, ax = None, sort = True, bins = 20, **kwargs )   :
 
 if "__main__" == __name__ :
 
-    data = np.loadtxt("dp5.txt")
+    data = np.loadtxt("out.txt")
     x = data[:,0]
     y = data[:,1]
     print(data)
