@@ -4159,12 +4159,14 @@ class Beamline(Line2, Magnet, ApertureObject):
         xs = [pp.project_to_xxp_plane() / MM for pp in pp_x_end]
         ys = [pp.project_to_yyp_plane() / MM for pp in pp_y_end]
 
-        s = BaseUtils.Statistic()
+        s:BaseUtils.Statistic = BaseUtils.Statistic()
 
         print(
             f"delta={delta}," +
             f"avg_size_x={s.clear().add_all(P2.extract(xs)[0]).helf_width()}mm," +
-            f"avg_size_y={s.clear().add_all(P2.extract(ys)[0]).helf_width()}mm"
+            f"avg_size_y={s.clear().add_all(P2.extract(ys)[0]).helf_width()}mm," + 
+            f"center_x={s.clear().add_all(P2.extract(xs)[0]).average()}mm," + 
+            f"center_y={s.clear().add_all(P2.extract(ys)[0]).average()}mm" 
         )
 
         return (xs, ys)
@@ -5814,11 +5816,13 @@ class Plot2:
         Plot2.plot_p2(p3_to_p2(p), describe)
 
     @staticmethod
-    def plot_p2s(ps: List[P2], describe="r-") -> None:
+    def plot_p2s(ps: List[P2], describe="r-",circle:bool=False) -> None:
         """
         绘制点 P2 数组，多个点
+        circle 是否画一个封闭的圆
         """
-        Plot2.plot_xy_array([p.x for p in ps], [p.y for p in ps], describe)
+        ps_c = ps + [ps[0]] if circle else ps
+        Plot2.plot_xy_array([p.x for p in ps_c], [p.y for p in ps_c], describe)
 
     @staticmethod
     def plot_p3s(
@@ -6543,7 +6547,7 @@ if __name__ == "__main__":
         bl = gantry.create_second_bending_part(sp, sd)
 
         beamline_phase_ellipse_multi_delta(
-            bl, 16, [0.0], describles=['r-'], foot_step=10*MM
+            bl, 16, [0.0], describles=['r-'], foot_step=20*MM
         )
 
         gantry = HUST_SC_GANTRY(
@@ -6591,19 +6595,21 @@ if __name__ == "__main__":
         bl = gantry.create_second_bending_part(sp, sd)
 
         beamline_phase_ellipse_multi_delta(
-            bl, 16, [0.0], describles=['b-'], foot_step=10*MM
+            bl, 16, [0.0], describles=['b-'], foot_step=20*MM
         )
 
-        plt.show()
+        # plt.show()
 
         # cct: CCT = (bl.magnets[0])
         # print(cct.conductor_length())
-    if True:  # 束斑绘制
+    if False:  # 束斑绘制
         BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
 
-        data = [4.675,	41.126 	, 88.773,	98.139,
-                91.748 	, 101.792,	62.677,	89.705,
-                9409.261,	-7107.359, 25, 40, 34]  # *99.8/100
+        data = [4.675,	41.126 	, 
+                88.773,	98.139, 91.748 	, 
+                101.792,	62.677,	89.705,
+                9409.261,	-7107.359, 
+                25, 40, 34]  # *99.8/100
 
         gantry = HUST_SC_GANTRY(
             qs3_gradient=data[0],
@@ -6865,3 +6871,114 @@ if __name__ == "__main__":
         )
 
         plt.show()
+
+    if False:
+        BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
+
+        data = [5.546, -57.646, 87.426, 92.151, 91.668, 94.503, 	72.425,	82.442,	9445.242 	,
+                -5642.488,	25.000,	40.000, 	34.000
+                ]
+
+        gantry = HUST_SC_GANTRY(
+            qs3_gradient=data[0],
+            qs3_second_gradient=data[1],
+            dicct345_tilt_angles=[30, data[2], data[3], data[4]],
+            agcct345_tilt_angles=[data[5], 30, data[6], data[7]],
+            dicct345_current=data[8],
+            agcct345_current=data[9],
+            agcct3_winding_number=data[10],
+            agcct4_winding_number=data[11],
+            agcct5_winding_number=data[12],
+            agcct3_bending_angle=-67.5*(data[10])/(data[10]+data[11]+data[12]),
+            agcct4_bending_angle=-67.5*(data[11])/(data[10]+data[11]+data[12]),
+            agcct5_bending_angle=-67.5*(data[12])/(data[10]+data[11]+data[12]),
+
+            DL1=0.9007765,
+            GAP1=0.4301517,
+            GAP2=0.370816,
+            qs1_length=0.2340128,
+            qs1_aperture_radius=60 * MM,
+            qs1_gradient=0.0,
+            qs1_second_gradient=0.0,
+            qs2_length=0.200139,
+            qs2_aperture_radius=60 * MM,
+            qs2_gradient=0.0,
+            qs2_second_gradient=0.0,
+
+            DL2=2.35011,
+            GAP3=0.43188,
+            qs3_length=0.24379,
+
+            agcct345_inner_small_r=83 * MM,
+            agcct345_outer_small_r=98 * MM,  # 83+15
+            dicct345_inner_small_r=114 * MM,  # 83+30+1
+            dicct345_outer_small_r=130 * MM,  # 83+45 +2
+        )
+        bl_all = gantry.create_beamline()
+
+        f = gantry.first_bending_part_length()
+
+        sp = bl_all.trajectory.point_at(f)
+        sd = bl_all.trajectory.direct_at(f)
+
+        bl = gantry.create_second_bending_part(sp, sd)
+
+        beamline_phase_ellipse_multi_delta(
+            bl, 32, BaseUtils.linspace(-0.1,0.1,21), describles=['r-'], foot_step=20*MM)
+
+
+    if True:
+        BaseUtils.i_am_sure_my_code_closed_in_if_name_equal_main()
+        data = [4.675,	41.126 	, 
+                88.773,	98.139, 91.748 	, 
+                101.792,	62.677,	89.705,
+                9409.261,	-7107.359, 
+                25, 40, 34]  # *99.8/100
+
+        gantry = HUST_SC_GANTRY(
+            qs3_gradient=data[0],
+            qs3_second_gradient=data[1],
+            dicct345_tilt_angles=[30, data[2], data[3], data[4]],
+            agcct345_tilt_angles=[data[5], 30, data[6], data[7]],
+            dicct345_current=data[8],
+            agcct345_current=data[9],
+            agcct3_winding_number=data[10],
+            agcct4_winding_number=data[11],
+            agcct5_winding_number=data[12],
+            agcct3_bending_angle=-67.5*(data[10])/(data[10]+data[11]+data[12]),
+            agcct4_bending_angle=-67.5*(data[11])/(data[10]+data[11]+data[12]),
+            agcct5_bending_angle=-67.5*(data[12])/(data[10]+data[11]+data[12]),
+
+            DL1=0.9007765,
+            GAP1=0.4301517,
+            GAP2=0.370816,
+            qs1_length=0.2340128,
+            qs1_aperture_radius=60 * MM,
+            qs1_gradient=0.0,
+            qs1_second_gradient=0.0,
+            qs2_length=0.200139,
+            qs2_aperture_radius=60 * MM,
+            qs2_gradient=0.0,
+            qs2_second_gradient=0.0,
+
+            DL2=2.35011,
+            GAP3=0.43188,
+            qs3_length=0.24379,
+
+            agcct345_inner_small_r=92.5 * MM + 0.1*MM,  # 92.5
+            agcct345_outer_small_r=108.5 * MM + 0.1*MM,  # 83+15
+            dicct345_inner_small_r=124.5 * MM + 0.1*MM,  # 83+30+1
+            dicct345_outer_small_r=140.5 * MM + 0.1*MM,  # 83+45 +2
+        )
+        bl_all = gantry.create_beamline()
+
+        f = gantry.first_bending_part_length()
+
+        sp = bl_all.trajectory.point_at(f)
+        sd = bl_all.trajectory.direct_at(f)
+
+        start = time.time()
+        bl = gantry.create_second_bending_part(sp, sd)
+
+        beamline_phase_ellipse_multi_delta(
+            bl, 16, BaseUtils.linspace(-0.1,0.1,21), describles=['r-'], foot_step=20*MM)

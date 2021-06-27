@@ -100,14 +100,14 @@ y4=P2.extract_y(g)
 fig = plt.figure()
 ax = fig.add_subplot(111)
 
-lns1 = ax.plot(x1, y1, 'g--',linewidth=3, label = 'dipole CCT (SCOFF)')
-lns2 = ax.plot(x3, y3, 'g-',linewidth=3, label = 'dipole CCT')
+# lns1 = ax.plot(x1, y1, 'g-',linewidth=3, label = '')
+lns2 = ax.plot(x3, y3, 'g-',linewidth=3, label = '')
 ax2 = ax.twinx()
-lns3 = ax2.plot(x2, y2, 'b--',linewidth=3, label = 'AG-CCT (SCOFF)')
-lns4 = ax2.plot(x4, y4, 'b-',linewidth=3, label = 'AG-CCT')
+# lns3 = ax2.plot(x2, y2, 'b:',linewidth=3, label = '')
+lns4 = ax2.plot(x4, y4, 'b-',linewidth=3, label = '')
 
-lns = lns1+lns3+lns2+lns4
-# lns = lns3+lns4
+# lns = lns1+lns3+lns2+lns4
+lns = lns2+lns4
 labs = [l.get_label() for l in lns]
 ax.legend(lns, labs, prop={'size': 25},loc='lower right')
 

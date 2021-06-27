@@ -19,8 +19,8 @@ from pycuda.compiler import SourceModule
 import numpy
 import time
 import sys
+from typing import Callable, Dict, Generic, Iterable, List, NoReturn, Optional, Tuple, TypeVar, Union
 
-from scipy.optimize.optimize import main
 from cctpy import *
 
 
@@ -897,7 +897,7 @@ class GPU_ACCELERATOR:
                     + qs.local_coordinate_system.YI.to_list() + qs.local_coordinate_system.ZI.to_list()
                     + [qs.length, qs.gradient, qs.second_gradient, qs.aperture_radius], dtype=self.numpy_dtype)
             else:
-                raise ValueError(f"{m} 无法用 GOU 加速")
+                raise ValueError(f"{m} 无法用 GPU 加速")
 
         kls_all = numpy.concatenate(tuple(kls_list))
         p0s_all = numpy.concatenate(tuple(p0s_list))

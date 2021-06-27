@@ -22,8 +22,8 @@ z0 = 1.0
 x2 = theta_steps
 y2 = z0 / (2 * np.pi) * theta_steps
 # 三维运动
-x3 = r*np.cos(theta_steps)
-z3 = r*np.sin(theta_steps)
+x3 = r*np.sin(theta_steps)
+z3 = r*np.cos(theta_steps)
 y3 = y2
 
 ax.plot(x2, y2, "r-")

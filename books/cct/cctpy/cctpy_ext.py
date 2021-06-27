@@ -345,8 +345,6 @@ class Function_Part:
     def append(self, func: Callable[[float], _T], start: float, end: float, scale: float = 1.0) -> 'Function_Part':
         """
         原函数段尾加新的函数
-
-        这代码写得极其精妙
         """
         appended = Function_Part(func, start, end, scale)
 

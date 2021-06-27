@@ -116,7 +116,7 @@ if True:
         s_number = 36*34  # 数目
         current_cct = agcct5_out  # 当前 CCT 和 wire
         固定坐标系 = False
-        洛伦兹力 = False  # else 压强
+        洛伦兹力 = True  # else 压强
         file_name = f'./四极CCT第3段外层{"固定" if 固定坐标系 else "滑动"}坐标系-{"洛伦兹力" if 洛伦兹力 else "压强"}.txt'
     # if False:
     #     delta_angle = -10  # 当 CCT 负 ksi 方向绕线时，写负数
